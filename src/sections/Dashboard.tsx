@@ -6,14 +6,17 @@ import { CategoryIcon, Donut, SegBar, StatCard, TrendBars } from '@/components/a
 import type { View } from '@/components/app/Chrome'
 
 export function Dashboard({ month, go }: { month: string; go: (v: View) => void }) {
-  const { categories, transactions: allTxns } = useBudget()
+  const { categories, transactions: allTxns, incomes, monthlyIncome } = useBudget()
   const isEmpty = allTxns.length === 0
   const { txns, spent, earned, byCategory } = useMonthSpend(month)
   const isCurrent = month === monthKey(new Date())
 
   const budgeted = categories.filter((c) => c.limit > 0)
   const totalLimit = budgeted.reduce((s, c) => s + c.limit, 0)
-  const left = earned - spent
+  // Expected income from the Budget tab; once real deposits arrive, those win.
+  const expected = incomes.reduce((s, i) => s + i.amount, 0) || monthlyIncome || 0
+  const incomeBasis = earned > 0 ? earned : expected
+  const left = incomeBasis - spent
 
   // Daily pace for the current month
   const pace = useMemo(() => {
@@ -88,12 +91,17 @@ export function Dashboard({ month, go }: { month: string; go: (v: View) => void 
     <div className="space-y-6">
       {/* Stat row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={`Income · ${monthLabel(month).split(' ')[0]}`} value={fmt(earned)} sub={`${txns.filter((t) => t.amount < 0).length} deposits`} delay={0} />
+        <StatCard
+          label={`Income · ${monthLabel(month).split(' ')[0]}`}
+          value={fmt(incomeBasis)}
+          sub={expected > 0 ? `${fmt(earned)} received of ${fmt(expected)} expected` : `${txns.filter((t) => t.amount < 0).length} deposits`}
+          delay={0}
+        />
         <StatCard label="Spent" value={fmt(spent)} sub={`${txns.filter((t) => t.amount > 0).length} transactions`} tone="ink" delay={60} />
         <StatCard
           label={left >= 0 ? 'Left to spend' : 'Over by'}
           value={fmt(Math.abs(left))}
-          sub={left >= 0 ? 'of this month’s income' : 'past this month’s income'}
+          sub={left >= 0 ? (earned > 0 ? 'of this month’s income' : 'of expected income') : 'past this month’s income'}
           tone={left >= 0 ? 'moss' : 'clay'}
           delay={120}
         />
