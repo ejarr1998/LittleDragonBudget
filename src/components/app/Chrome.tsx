@@ -71,7 +71,10 @@ function SyncBadge() {
 
 export function MobileNav({ view, setView }: { view: View; setView: (v: View) => void }) {
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0e1a1c] flex justify-around px-2 py-2 rounded-t-[20px]">
+    <nav
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#0e1a1c] flex justify-around px-2 pt-2 rounded-t-[20px]"
+      style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+    >
       {NAV.map((n) => (
         <button
           key={n.id}

@@ -6,7 +6,8 @@ import { CategoryIcon, Donut, SegBar, StatCard, TrendBars } from '@/components/a
 import type { View } from '@/components/app/Chrome'
 
 export function Dashboard({ month, go }: { month: string; go: (v: View) => void }) {
-  const { categories } = useBudget()
+  const { categories, transactions: allTxns, resetDemo } = useBudget()
+  const isEmpty = allTxns.length === 0
   const { txns, spent, earned, byCategory } = useMonthSpend(month)
   const isCurrent = month === monthKey(new Date())
 
@@ -61,6 +62,33 @@ export function Dashboard({ month, go }: { month: string; go: (v: View) => void 
     return v >= 0.85 && v <= 1
   })
   const recent = txns.slice(0, 6)
+
+  if (isEmpty) {
+    return (
+      <div data-animation="fade-in-up" className="rounded-[20px] bg-white p-10 text-center max-w-xl mx-auto mt-8">
+        <img src="./dragon.png" alt="Little Dragon" className="w-20 h-20 object-contain mx-auto" />
+        <h2 className="font-display text-3xl mt-4">A clean slate</h2>
+        <p className="text-sm text-[#3d4d50] leading-relaxed mt-3 max-w-sm mx-auto">
+          No transactions yet. Add your first one with the <strong>+ button</strong> above,
+          import a bank CSV from <strong>Transactions</strong>, or load the demo data to explore.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3 mt-6">
+          <button
+            onClick={() => go('transactions')}
+            className="rounded-full bg-[#0f5257] text-white font-semibold text-sm px-6 py-3 hover:bg-[#0e1a1c] transition-colors"
+          >
+            Start tracking
+          </button>
+          <button
+            onClick={resetDemo}
+            className="rounded-full bg-[#ddedf0] text-[#0e1a1c] font-semibold text-sm px-6 py-3 hover:bg-[#c4dbe0] transition-colors"
+          >
+            Load demo data
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

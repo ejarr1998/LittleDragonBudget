@@ -113,10 +113,11 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(KEY)
       if (raw) {
         const parsed = JSON.parse(raw) as BudgetState
-        if (parsed.transactions?.length && parsed.categories?.length) return parsed
+        if (parsed.categories?.length) return parsed
       }
-    } catch { /* fall through to seed */ }
-    return seedState()
+    } catch { /* fall through to empty start */ }
+    // New users start with a clean slate — demo data is opt-in via the menu.
+    return { transactions: [], categories: DEFAULT_CATEGORIES, goals: [], monthlyIncome: 0 }
   })
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting')
