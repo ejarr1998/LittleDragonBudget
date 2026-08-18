@@ -4,72 +4,69 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.625rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+    /* Clover palette — soft blue-green atmosphere, near-black ink */
+    --paper: #ddedf0;
+    --paper-deep: #c4dbe0;
+    --ink: #0e1a1c;
+    --ink-soft: #3d4d50;
+    --teal: #0f5257;
+    --teal-bright: #2a9aa2;
+    --moss: #1f7a4d;
+    --clay: #c0564b;
+    --amber: #b7791f;
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 191 31% 90%;
+    --foreground: 190 32% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 190 32% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 190 32% 8%;
+    --primary: 183 71% 20%;
+    --primary-foreground: 191 31% 94%;
+    --secondary: 191 25% 85%;
+    --secondary-foreground: 190 32% 8%;
+    --muted: 191 20% 86%;
+    --muted-foreground: 190 12% 34%;
+    --accent: 191 25% 85%;
+    --accent-foreground: 190 32% 8%;
+    --destructive: 8 48% 52%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 190 18% 78%;
+    --input: 190 18% 78%;
+    --ring: 183 71% 20%;
+    --radius: 1.25rem;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { border-color: hsl(var(--border)); }
+  html { -webkit-font-smoothing: antialiased; }
   body {
-    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
   }
+  .font-display { font-family: 'Fraunces', Georgia, serif; }
+  .font-mono-num {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
 }
+
+/* Staggered entrance — driven by data-animation attributes */
+[data-animation='fade-in'] { animation: cl-fade 0.5s ease both; }
+[data-animation='fade-in-up'] { animation: cl-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes cl-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cl-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* Slide-left drawer */
+.cl-drawer { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+.cl-backdrop { transition: opacity 0.4s ease; }
+
+/* Progress bar fill grow */
+.cl-bar { transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Thin scrollbars for panels */
+.cl-scroll::-webkit-scrollbar { width: 6px; }
+.cl-scroll::-webkit-scrollbar-thumb { background: rgba(14, 26, 28, 0.18); border-radius: 3px; }
