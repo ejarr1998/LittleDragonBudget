@@ -16,13 +16,8 @@ export function Sidebar({ view, setView, onAdd }: { view: View; setView: (v: Vie
   return (
     <aside className="hidden md:flex w-[240px] shrink-0 flex-col bg-[#0e1a1c] text-[#ddedf0] rounded-[20px] p-5 sticky top-6 h-[calc(100vh-3rem)]">
       <div className="flex items-center gap-2.5 px-1">
-        <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden>
-          <circle cx="9" cy="9" r="6.5" fill="#2a9aa2" />
-          <circle cx="17" cy="9" r="6.5" fill="#2a9aa2" opacity="0.55" />
-          <circle cx="9" cy="17" r="6.5" fill="#2a9aa2" opacity="0.55" />
-          <circle cx="17" cy="17" r="6.5" fill="#c4dbe0" />
-        </svg>
-        <span className="font-display text-xl tracking-tight">Clover</span>
+        <img src="./dragon.png" alt="Little Dragon" className="w-9 h-9 object-contain" />
+        <span className="font-display text-xl tracking-tight">Little Dragon</span>
       </div>
 
       <nav className="mt-8 flex flex-col gap-1">
