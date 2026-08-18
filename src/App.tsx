@@ -5,6 +5,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      {/* GitHub Pages serves under /LittleDragonBudget/ — catch all subpaths */}
+      <Route path="*" element={<Home />} />
     </Routes>
   )
 }
