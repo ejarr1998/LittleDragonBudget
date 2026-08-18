@@ -43,7 +43,10 @@ export function AddTransaction({ open, onClose }: { open: boolean; onClose: () =
         role="dialog" aria-label="Add transaction"
       >
         <div className="flex items-center justify-between px-7 pt-7">
-          <h2 className="font-display text-2xl">Add transaction</h2>
+          <h2 className="font-display text-2xl flex items-center gap-2.5">
+            <img src="./dragon.png" alt="" className="w-9 h-9 object-contain" />
+            Add transaction
+          </h2>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-[#ddedf0] transition-colors" aria-label="Close">
             <X size={20} />
           </button>

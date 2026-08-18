@@ -50,7 +50,8 @@ function Shell() {
 
         <main className="flex-1 min-w-0">
           <header className="flex flex-wrap items-center justify-between gap-3 mb-6">
-            <div>
+            <div className="flex items-center gap-3">
+              <img src="./dragon.png" alt="Little Dragon" className="md:hidden w-10 h-10 object-contain" />
               <h1 className="font-display text-3xl tracking-tight">{TITLES[view]}</h1>
             </div>
             <div className="flex items-center gap-2">

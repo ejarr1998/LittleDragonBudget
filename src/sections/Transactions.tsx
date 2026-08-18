@@ -69,6 +69,7 @@ export function Transactions({ month }: { month: string }) {
     <div className="space-y-4">
       {/* Bank connection notice + CSV import */}
       <div data-animation="fade-in-up" className="rounded-[20px] bg-[#0e1a1c] text-[#ddedf0] p-6 flex flex-wrap items-center gap-5">
+        <img src="./dragon.png" alt="" className="w-14 h-14 object-contain shrink-0 hidden sm:block" />
         <div className="flex-1 min-w-[240px]">
           <h3 className="font-display text-xl">Connect your bank</h3>
           <p className="text-sm text-[#9fc3c9] mt-1.5 leading-relaxed max-w-lg">
