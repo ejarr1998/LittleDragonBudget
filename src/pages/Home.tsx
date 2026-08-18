@@ -1,5 +1,8 @@
-import { useState } from 'react'
-import { Plus, RotateCcw } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, MoreVertical, RotateCcw, Eraser, Maximize, Minimize } from 'lucide-react'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { BudgetProvider, useBudget } from '@/lib/store'
 import { monthKey } from '@/lib/money'
 import { MobileNav, MonthSwitcher, Sidebar, type View } from '@/components/app/Chrome'
@@ -26,7 +29,19 @@ function Shell() {
   const setView = (v: View) => { setViewRaw(v); history.replaceState(null, '', `#${v}`) }
   const [month, setMonth] = useState(monthKey(new Date()))
   const [addOpen, setAddOpen] = useState(false)
-  const { resetDemo } = useBudget()
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const { resetDemo, startFresh } = useBudget()
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen()
+    else document.documentElement.requestFullscreen()
+  }
 
   return (
     <div className="min-h-screen p-4 md:p-6 pb-24 md:pb-6">
@@ -48,13 +63,38 @@ function Shell() {
                 <Plus size={18} />
               </button>
               <button
-                onClick={() => { if (confirm('Reset to demo data? Your changes will be lost.')) resetDemo() }}
+                onClick={toggleFullscreen}
                 className="p-2.5 rounded-full hover:bg-[#c4dbe0] text-[#3d4d50] transition-colors"
-                title="Reset demo data"
-                aria-label="Reset demo data"
+                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                aria-label="Toggle fullscreen"
               >
-                <RotateCcw size={16} />
+                {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
               </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="p-2.5 rounded-full hover:bg-[#c4dbe0] text-[#3d4d50] transition-colors"
+                    aria-label="Data options"
+                  >
+                    <MoreVertical size={16} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-2xl">
+                  <DropdownMenuItem
+                    onClick={() => { if (confirm('Start fresh? This permanently deletes ALL transactions and goals (your category budgets stay). This cannot be undone.')) startFresh() }}
+                    className="gap-2 text-[#c0564b] focus:text-[#c0564b]"
+                  >
+                    <Eraser size={15} /> Start fresh — clear all data
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => { if (confirm('Load demo data? This replaces everything with sample transactions.')) resetDemo() }}
+                    className="gap-2"
+                  >
+                    <RotateCcw size={15} /> Load demo data
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
 

@@ -102,6 +102,7 @@ interface Store extends BudgetState {
   contribute: (goalId: string, amount: number) => void
   deleteGoal: (id: string) => void
   resetDemo: () => void
+  startFresh: () => void
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -185,6 +186,12 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     })),
     deleteGoal: (id) => setState((s) => ({ ...s, goals: s.goals.filter((g) => g.id !== id) })),
     resetDemo: () => setState(seedState()),
+    startFresh: () => setState((s) => ({
+      ...s,
+      transactions: [],
+      goals: [],
+      // keep categories + limits — that's your budget setup, not test data
+    })),
   }), [state, syncStatus])
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
