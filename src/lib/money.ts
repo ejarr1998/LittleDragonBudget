@@ -40,6 +40,8 @@ const RULES: [RegExp, string][] = [
   [/electric|power|utility|water|gas bill|pge|coned/i, 'utilities'],
   [/verizon|at&t|t-mobile|comcast|xfinity|internet|phone bill/i, 'utilities'],
   [/geico|progressive|insurance|allstate/i, 'insurance'],
+  [/day ?care|child ?care|preschool|kindercare|bright horizons|montessori|kiddie/i, 'daycare'],
+  [/savings|emergency fund|transfer to sav/i, 'savings'],
   [/spotify|netflix|hulu|disney|hbo|youtube|apple\.com\/bill|icloud|amazon prime|subscri/i, 'subscriptions'],
   [/gym|fitness|planet fitness|equinox|peloton/i, 'health'],
   [/cvs|walgreens|pharmacy|doctor|dental|hospital|therapy/i, 'health'],

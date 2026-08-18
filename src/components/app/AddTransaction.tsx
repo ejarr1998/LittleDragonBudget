@@ -73,7 +73,7 @@ export function AddTransaction({ open, onClose }: { open: boolean; onClose: () =
             <span className="text-[11px] uppercase tracking-[0.14em] text-[#3d4d50]">Amount</span>
             <div className="mt-2 flex items-baseline gap-1 border-b-2 border-[#0e1a1c] pb-2">
               <span className="font-display text-3xl text-[#3d4d50]">$</span>
-              <input
+              <input autoComplete="off"
                 type="number" min="0" step="0.01" value={amount} autoFocus
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
@@ -86,7 +86,7 @@ export function AddTransaction({ open, onClose }: { open: boolean; onClose: () =
             <span className="text-[11px] uppercase tracking-[0.14em] text-[#3d4d50]">
               {kind === 'expense' ? 'Merchant' : 'Source'}
             </span>
-            <input
+            <input autoComplete="off"
               value={merchant} onChange={(e) => setMerchant(e.target.value)}
               placeholder={kind === 'expense' ? 'e.g. Trader Joe’s' : 'e.g. Acme Corp — Salary'}
               className="mt-2 w-full rounded-[14px] bg-[#ddedf0]/60 px-4 py-3 text-sm outline-none focus:ring-2 ring-[#0f5257] placeholder:text-[#7a9aa0]"
@@ -117,7 +117,7 @@ export function AddTransaction({ open, onClose }: { open: boolean; onClose: () =
 
           <label className="block">
             <span className="text-[11px] uppercase tracking-[0.14em] text-[#3d4d50]">Date</span>
-            <input
+            <input autoComplete="off"
               type="date" value={date} onChange={(e) => setDate(e.target.value)}
               className="mt-2 w-full rounded-[14px] bg-[#ddedf0]/60 px-4 py-3 text-sm outline-none focus:ring-2 ring-[#0f5257]"
             />
@@ -125,7 +125,7 @@ export function AddTransaction({ open, onClose }: { open: boolean; onClose: () =
 
           <label className="block">
             <span className="text-[11px] uppercase tracking-[0.14em] text-[#3d4d50]">Note (optional)</span>
-            <input
+            <input autoComplete="off"
               value={note} onChange={(e) => setNote(e.target.value)}
               placeholder="Dinner with Sam"
               className="mt-2 w-full rounded-[14px] bg-[#ddedf0]/60 px-4 py-3 text-sm outline-none focus:ring-2 ring-[#0f5257] placeholder:text-[#7a9aa0]"

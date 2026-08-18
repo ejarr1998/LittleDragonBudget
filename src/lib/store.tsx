@@ -7,6 +7,8 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'rent', name: 'Rent', bucket: 'fixed', limit: 1650, color: '#0f5257', icon: 'home' },
   { id: 'utilities', name: 'Utilities & Phone', bucket: 'fixed', limit: 220, color: '#17696f', icon: 'zap' },
   { id: 'insurance', name: 'Insurance', bucket: 'fixed', limit: 180, color: '#1f8289', icon: 'shield' },
+  { id: 'daycare', name: 'Daycare', bucket: 'fixed', limit: 1200, color: '#d06079', icon: 'baby' },
+  { id: 'savings', name: 'Savings', bucket: 'fixed', limit: 500, color: '#1f8a70', icon: 'piggy' },
   { id: 'subscriptions', name: 'Subscriptions', bucket: 'fixed', limit: 75, color: '#2a9aa2', icon: 'repeat' },
   { id: 'groceries', name: 'Groceries', bucket: 'flexible', limit: 550, color: '#1f7a4d', icon: 'cart' },
   { id: 'dining', name: 'Dining Out', bucket: 'flexible', limit: 320, color: '#3d9970', icon: 'utensils' },
@@ -90,6 +92,15 @@ function seedState(): BudgetState {
   }
 }
 
+/** Add any newly-introduced default categories to saved budgets. */
+function mergeCategories(saved: Category[] | undefined): Category[] {
+  const list = saved?.length ? [...saved] : []
+  for (const d of DEFAULT_CATEGORIES) {
+    if (!list.some((c) => c.id === d.id)) list.push({ ...d })
+  }
+  return list
+}
+
 // --- Store -------------------------------------------------------------------
 const KEY = 'clover-budget-v1'
 
@@ -119,7 +130,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(KEY)
       if (raw) {
         const parsed = JSON.parse(raw) as BudgetState
-        if (parsed.categories?.length) return { ...parsed, incomes: parsed.incomes ?? [], goals: parsed.goals ?? [] }
+        if (parsed.categories?.length) return { ...parsed, categories: mergeCategories(parsed.categories), incomes: parsed.incomes ?? [], goals: parsed.goals ?? [] }
       }
     } catch { /* fall through to empty start */ }
     // New users start with a clean slate — demo data is opt-in via the menu.
@@ -138,7 +149,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
         uidRef.current = remoteUid
         if (remote?.transactions?.length && remote?.categories?.length) {
-          setState({ ...remote, incomes: remote.incomes ?? [], goals: remote.goals ?? [] }) // fill fields missing from older saves
+          setState({ ...remote, categories: mergeCategories(remote.categories), incomes: remote.incomes ?? [], goals: remote.goals ?? [] }) // fill fields missing from older saves
         } else if (remote === null) {
           // First sign-in on a fresh account: push the local seed up.
           saveRemote(remoteUid, JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? state, () => setSyncStatus('offline'))

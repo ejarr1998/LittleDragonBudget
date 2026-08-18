@@ -113,18 +113,18 @@ function IncomeSection({ earned }: { earned: number }) {
       {formOpen ? (
         <div className="mt-3 rounded-[16px] bg-[#ddedf0]/50 p-4 space-y-2.5">
           {editId && <p className="text-xs font-semibold text-[#0f5257]">Editing income source</p>}
-          <input
+          <input autoComplete="off"
             autoFocus value={name} onChange={(e) => setName(e.target.value)}
             placeholder="Source, e.g. Acme Corp — Salary"
             className="w-full rounded-[12px] bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 ring-[#0f5257]"
           />
           <div className="flex gap-2">
-            <input
+            <input autoComplete="off"
               value={owner} onChange={(e) => setOwner(e.target.value)}
               placeholder="Owner, e.g. Alex"
               className="flex-1 rounded-[12px] bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 ring-[#0f5257]"
             />
-            <input
+            <input autoComplete="off"
               type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)}
               placeholder="$ / month"
               className="w-32 rounded-[12px] bg-white px-4 py-2.5 text-sm tnum outline-none focus:ring-2 ring-[#0f5257]"
@@ -321,7 +321,7 @@ export function Budget({ month }: { month: string }) {
                         <span className="text-sm font-medium flex-1 truncate">{c.name}</span>
                         {isEditing ? (
                           <span className="flex items-center gap-1.5">
-                            <input
+                            <input autoComplete="off"
                               autoFocus type="number" min="0" value={draft}
                               onChange={(e) => setDraft(e.target.value)}
                               onKeyDown={(e) => e.key === 'Enter' && save(c.id)}

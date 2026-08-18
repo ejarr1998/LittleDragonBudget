@@ -1,6 +1,6 @@
 import {
   Home, Zap, Shield, Repeat, ShoppingCart, UtensilsCrossed, Coffee, Car,
-  ShoppingBag, Ticket, Heart, Plane, MoreHorizontal, Banknote, type LucideIcon,
+  ShoppingBag, Ticket, Heart, Plane, MoreHorizontal, Banknote, Baby, PiggyBank, type LucideIcon,
 } from 'lucide-react'
 import { fmt } from '@/lib/money'
 
@@ -8,6 +8,7 @@ const ICONS: Record<string, LucideIcon> = {
   home: Home, zap: Zap, shield: Shield, repeat: Repeat, cart: ShoppingCart,
   utensils: UtensilsCrossed, coffee: Coffee, car: Car, bag: ShoppingBag,
   ticket: Ticket, heart: Heart, plane: Plane, dots: MoreHorizontal, income: Banknote,
+  baby: Baby, piggy: PiggyBank,
 }
 
 export function CategoryIcon({ icon, color, size = 16 }: { icon: string; color?: string; size?: number }) {
