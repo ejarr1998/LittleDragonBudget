@@ -102,6 +102,7 @@ interface Store extends BudgetState {
   undoImport: (importId: string) => number
   setLimit: (categoryId: string, limit: number) => void
   addIncome: (i: Omit<IncomeSource, 'id'>) => void
+  updateIncome: (id: string, patch: Partial<Omit<IncomeSource, 'id'>>) => void
   deleteIncome: (id: string) => void
   addGoal: (g: Omit<Goal, 'id'>) => void
   contribute: (goalId: string, amount: number) => void
@@ -199,6 +200,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       ...s, categories: s.categories.map((c) => (c.id === categoryId ? { ...c, limit } : c)),
     })),
     addIncome: (i) => setState((s) => ({ ...s, incomes: [...s.incomes, { ...i, id: uid() }] })),
+    updateIncome: (id, patch) => setState((s) => ({
+      ...s, incomes: s.incomes.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+    })),
     deleteIncome: (id) => setState((s) => ({ ...s, incomes: s.incomes.filter((i) => i.id !== id) })),
     addGoal: (g) => setState((s) => ({ ...s, goals: [...s.goals, { ...g, id: uid() }] })),
     contribute: (goalId, amount) => setState((s) => ({

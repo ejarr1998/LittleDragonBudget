@@ -12,20 +12,33 @@ export function useExpectedIncome() {
 }
 
 function IncomeSection({ earned }: { earned: number }) {
-  const { incomes, addIncome, deleteIncome } = useBudget()
+  const { incomes, addIncome, updateIncome, deleteIncome } = useBudget()
   const [adding, setAdding] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [owner, setOwner] = useState('')
   const [amount, setAmount] = useState('')
   const expected = incomes.reduce((s, i) => s + i.amount, 0)
   const owners: string[] = Array.from(new Set(incomes.map((i: { owner: string }) => i.owner).filter((o: string) => o !== 'Joint')))
 
+  const resetForm = () => { setName(''); setOwner(''); setAmount(''); setAdding(false); setEditId(null) }
+
+  const startEdit = (i: { id: string; name: string; owner: string; amount: number }) => {
+    setAdding(false)
+    setEditId(i.id)
+    setName(i.name); setOwner(i.owner); setAmount(String(i.amount))
+  }
+
   const submit = () => {
     const a = parseFloat(amount)
     if (!name.trim() || !owner.trim() || !(a > 0)) return
-    addIncome({ name: name.trim(), owner: owner.trim(), amount: a })
-    setName(''); setOwner(''); setAmount(''); setAdding(false)
+    const payload = { name: name.trim(), owner: owner.trim(), amount: a }
+    if (editId) updateIncome(editId, payload)
+    else addIncome(payload)
+    resetForm()
   }
+
+  const formOpen = adding || editId !== null
 
   return (
     <div data-animation="fade-in-up" className="rounded-[20px] bg-white p-5 sm:p-6">
@@ -77,6 +90,13 @@ function IncomeSection({ earned }: { earned: number }) {
             </div>
             <span className="font-mono-num text-sm shrink-0">{fmt(i.amount)}<span className="text-[#7a9aa0] text-xs">/mo</span></span>
             <button
+              onClick={() => startEdit(i)}
+              className="p-1.5 rounded-full text-[#3d4d50] hover:bg-[#ddedf0] transition-colors shrink-0"
+              aria-label={`Edit ${i.name}`}
+            >
+              <Pencil size={13} />
+            </button>
+            <button
               onClick={() => deleteIncome(i.id)}
               className="sm:opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#c0564b] hover:bg-[#c0564b]/10 transition-all shrink-0"
               aria-label={`Delete ${i.name}`}
@@ -90,8 +110,9 @@ function IncomeSection({ earned }: { earned: number }) {
         )}
       </div>
 
-      {adding ? (
+      {formOpen ? (
         <div className="mt-3 rounded-[16px] bg-[#ddedf0]/50 p-4 space-y-2.5">
+          {editId && <p className="text-xs font-semibold text-[#0f5257]">Editing income source</p>}
           <input
             autoFocus value={name} onChange={(e) => setName(e.target.value)}
             placeholder="Source, e.g. Acme Corp — Salary"
@@ -123,8 +144,10 @@ function IncomeSection({ earned }: { earned: number }) {
             ))}
           </div>
           <div className="flex gap-2 pt-1">
-            <button onClick={submit} className="rounded-full bg-[#0f5257] text-white text-sm font-semibold px-5 py-2 hover:bg-[#0e1a1c] transition-colors">Add income</button>
-            <button onClick={() => setAdding(false)} className="rounded-full bg-white text-sm font-medium px-5 py-2"><X size={14} className="inline mr-1" />Cancel</button>
+            <button onClick={submit} className="rounded-full bg-[#0f5257] text-white text-sm font-semibold px-5 py-2 hover:bg-[#0e1a1c] transition-colors">
+              {editId ? 'Save changes' : 'Add income'}
+            </button>
+            <button onClick={resetForm} className="rounded-full bg-white text-sm font-medium px-5 py-2"><X size={14} className="inline mr-1" />Cancel</button>
           </div>
         </div>
       ) : (
