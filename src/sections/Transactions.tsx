@@ -4,6 +4,7 @@ import { useBudget } from '@/lib/store'
 import { categorize, fmt, monthKey, parseCSV, todayKey } from '@/lib/money'
 import { parseStatementPDF } from '@/lib/pdf'
 import { CategoryIcon } from '@/components/app/ui'
+import { CategoryPicker } from '@/components/app/CategoryPicker'
 
 type Filter = 'all' | 'expense' | 'income'
 
@@ -132,16 +133,14 @@ export function Transactions({ month }: { month: string }) {
             />
           </div>
           {!qIncome && (
-            <select
-              value={effectiveCat}
-              onChange={(e) => setQCat(e.target.value)}
-              className="rounded-full px-3.5 py-2.5 text-xs font-semibold text-white outline-none cursor-pointer appearance-none text-center"
-              style={{ backgroundColor: effectiveCatColor }}
-            >
-              {categories.filter((c) => c.id !== 'income').map((c) => (
-                <option key={c.id} value={c.id} className="text-[#0e1a1c] bg-white">{c.name}</option>
-              ))}
-            </select>
+            <CategoryPicker value={effectiveCat} onChange={setQCat} ariaLabel="Pick a category for this expense">
+              <span
+                className="inline-block rounded-full px-3.5 py-2.5 text-xs font-semibold text-white cursor-pointer"
+                style={{ backgroundColor: effectiveCatColor }}
+              >
+                {effectiveCatName}
+              </span>
+            </CategoryPicker>
           )}
           <button
             onClick={quickAdd}
@@ -265,14 +264,11 @@ export function Transactions({ month }: { month: string }) {
                       {income ? (
                         <span>Income</span>
                       ) : (
-                        <select
-                          value={t.categoryId}
-                          onChange={(e) => recategorize(t.id, e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="bg-transparent text-[11px] font-medium text-[#0f5257] underline decoration-dotted underline-offset-2 outline-none cursor-pointer"
-                        >
-                          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                        <CategoryPicker value={t.categoryId} onChange={(id) => recategorize(t.id, id)} ariaLabel={`Recategorize ${t.merchant}`}>
+                          <span className="text-[11px] font-medium text-[#0f5257] underline decoration-dotted underline-offset-2 cursor-pointer">
+                            {categories.find((c) => c.id === t.categoryId)?.name ?? 'Everything Else'}
+                          </span>
+                        </CategoryPicker>
                       )}
                       {t.note ? ` · ${t.note}` : ''}
                     </div>
