@@ -94,7 +94,9 @@ export function Dashboard({ month, go }: { month: string; go: (v: View) => void 
         <StatCard
           label={`Income · ${monthLabel(month).split(' ')[0]}`}
           value={fmt(incomeBasis)}
-          sub={expected > 0 ? `${fmt(earned)} received of ${fmt(expected)} expected` : `${txns.filter((t) => t.amount < 0).length} deposits`}
+          sub={expected > 0
+            ? (earned > 0 ? `${fmt(earned)} received of ${fmt(expected)} expected` : 'expected this month')
+            : `${txns.filter((t) => t.amount < 0).length} deposits`}
           delay={0}
         />
         <StatCard label="Spent" value={fmt(spent)} sub={`${txns.filter((t) => t.amount > 0).length} transactions`} tone="ink" delay={60} />

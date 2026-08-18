@@ -39,16 +39,25 @@ function IncomeSection({ earned }: { earned: number }) {
 
       {expected > 0 && (
         <div className="mt-4 rounded-[16px] bg-[#eef6f7] px-5 py-4">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="font-display text-3xl tnum text-[#1f7a4d]">{fmt(earned)}</span>
-            <span className="text-xs text-[#3d4d50]">received of</span>
-            <span className="font-display text-lg tnum">{fmt(expected)}</span>
-            <span className="text-xs text-[#3d4d50]">expected this month</span>
-            <span className="ml-auto font-mono-num text-xs text-[#3d4d50]">{Math.round((earned / expected) * 100)}%</span>
-          </div>
-          <div className="mt-3">
-            <SegBar pct={earned / expected} color="#1f7a4d" segments={30} />
-          </div>
+          {earned > 0 ? (
+            <>
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="font-display text-3xl tnum text-[#1f7a4d]">{fmt(earned)}</span>
+                <span className="text-xs text-[#3d4d50]">received of</span>
+                <span className="font-display text-lg tnum">{fmt(expected)}</span>
+                <span className="text-xs text-[#3d4d50]">expected this month</span>
+                <span className="ml-auto font-mono-num text-xs text-[#3d4d50]">{Math.round((earned / expected) * 100)}%</span>
+              </div>
+              <div className="mt-3">
+                <SegBar pct={earned / expected} color="#1f7a4d" segments={30} />
+              </div>
+            </>
+          ) : (
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="font-display text-3xl tnum">{fmt(expected)}</span>
+              <span className="text-xs text-[#3d4d50]">expected this month</span>
+            </div>
+          )}
         </div>
       )}
 
