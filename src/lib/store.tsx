@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { BudgetState, Category, Goal, Transaction } from '@/types'
+import type { BudgetState, Category, Goal, IncomeSource, Transaction } from '@/types'
 import { categorize, monthKey, uid } from '@/lib/money'
 import { loadRemote, saveRemote, type SyncStatus } from '@/lib/firebase'
 
@@ -80,6 +80,7 @@ function seedState(): BudgetState {
   return {
     transactions: seedTransactions(),
     categories: DEFAULT_CATEGORIES,
+    incomes: [{ id: uid(), name: 'Acme Corp — Salary', owner: 'Alex', amount: 6900 }],
     monthlyIncome: 6900,
     goals: [
       { id: uid(), name: 'Emergency fund', target: 10000, saved: 6400, color: '#0f5257' },
@@ -98,6 +99,8 @@ interface Store extends BudgetState {
   deleteTransaction: (id: string) => void
   importTransactions: (rows: { date: string; merchant: string; amount: number }[]) => number
   setLimit: (categoryId: string, limit: number) => void
+  addIncome: (i: Omit<IncomeSource, 'id'>) => void
+  deleteIncome: (id: string) => void
   addGoal: (g: Omit<Goal, 'id'>) => void
   contribute: (goalId: string, amount: number) => void
   deleteGoal: (id: string) => void
@@ -113,11 +116,11 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(KEY)
       if (raw) {
         const parsed = JSON.parse(raw) as BudgetState
-        if (parsed.categories?.length) return parsed
+        if (parsed.categories?.length) return { ...parsed, incomes: parsed.incomes ?? [], goals: parsed.goals ?? [] }
       }
     } catch { /* fall through to empty start */ }
     // New users start with a clean slate — demo data is opt-in via the menu.
-    return { transactions: [], categories: DEFAULT_CATEGORIES, goals: [], monthlyIncome: 0 }
+    return { transactions: [], categories: DEFAULT_CATEGORIES, goals: [], incomes: [], monthlyIncome: 0 }
   })
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting')
@@ -132,7 +135,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
         uidRef.current = remoteUid
         if (remote?.transactions?.length && remote?.categories?.length) {
-          setState(remote)
+          setState({ ...remote, incomes: remote.incomes ?? [], goals: remote.goals ?? [] }) // fill fields missing from older saves
         } else if (remote === null) {
           // First sign-in on a fresh account: push the local seed up.
           saveRemote(remoteUid, JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? state, () => setSyncStatus('offline'))
@@ -181,6 +184,8 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     setLimit: (categoryId, limit) => setState((s) => ({
       ...s, categories: s.categories.map((c) => (c.id === categoryId ? { ...c, limit } : c)),
     })),
+    addIncome: (i) => setState((s) => ({ ...s, incomes: [...s.incomes, { ...i, id: uid() }] })),
+    deleteIncome: (id) => setState((s) => ({ ...s, incomes: s.incomes.filter((i) => i.id !== id) })),
     addGoal: (g) => setState((s) => ({ ...s, goals: [...s.goals, { ...g, id: uid() }] })),
     contribute: (goalId, amount) => setState((s) => ({
       ...s, goals: s.goals.map((g) => (g.id === goalId ? { ...g, saved: Math.max(0, Math.min(g.target, g.saved + amount)) } : g)),

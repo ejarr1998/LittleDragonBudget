@@ -1,14 +1,123 @@
 import { useState } from 'react'
-import { Minus, Plus, Check, Pencil } from 'lucide-react'
+import { Minus, Plus, Check, Pencil, Trash2, Users, User, X } from 'lucide-react'
 import { useBudget, useMonthSpend } from '@/lib/store'
 import { fmt } from '@/lib/money'
 import { CategoryIcon, SegBar } from '@/components/app/ui'
 import { BUCKET_DESCRIPTIONS, BUCKET_LABELS, type Bucket } from '@/types'
 
+/** Income sources — individual or joint. */
+function IncomeSection({ earned }: { earned: number }) {
+  const { incomes, addIncome, deleteIncome } = useBudget()
+  const [adding, setAdding] = useState(false)
+  const [name, setName] = useState('')
+  const [owner, setOwner] = useState('')
+  const [amount, setAmount] = useState('')
+  const expected = incomes.reduce((s, i) => s + i.amount, 0)
+  const owners: string[] = Array.from(new Set(incomes.map((i: { owner: string }) => i.owner).filter((o: string) => o !== 'Joint')))
+
+  const submit = () => {
+    const a = parseFloat(amount)
+    if (!name.trim() || !owner.trim() || !(a > 0)) return
+    addIncome({ name: name.trim(), owner: owner.trim(), amount: a })
+    setName(''); setOwner(''); setAmount(''); setAdding(false)
+  }
+
+  return (
+    <div data-animation="fade-in-up" className="rounded-[20px] bg-white p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <h3 className="font-display text-xl">Income</h3>
+          <p className="text-xs text-[#3d4d50] mt-0.5">Who brings in what — individual or joint.</p>
+        </div>
+        <div className="text-right">
+          <div className="font-mono-num text-sm">{fmt(earned)} <span className="text-[#3d4d50]">received of</span> {fmt(expected)}</div>
+          <div className="text-[11px] text-[#3d4d50] mt-0.5">expected this month</div>
+        </div>
+      </div>
+      {expected > 0 && (
+        <div className="mt-4">
+          <SegBar pct={earned / expected} color="#1f7a4d" segments={30} />
+        </div>
+      )}
+
+      <div className="mt-4 divide-y divide-[#eef6f7]">
+        {incomes.map((i) => (
+          <div key={i.id} className="group flex items-center gap-3 py-3">
+            <span className={`p-2 rounded-full ${i.owner === 'Joint' ? 'bg-[#7a5aa8]/10 text-[#7a5aa8]' : 'bg-[#1f7a4d]/10 text-[#1f7a4d]'}`}>
+              {i.owner === 'Joint' ? <Users size={15} /> : <User size={15} />}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">{i.name}</div>
+              <div className="text-[11px] text-[#3d4d50]">{i.owner}</div>
+            </div>
+            <span className="font-mono-num text-sm">{fmt(i.amount)}/mo</span>
+            <button
+              onClick={() => deleteIncome(i.id)}
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#c0564b] hover:bg-[#c0564b]/10 transition-all"
+              aria-label={`Delete ${i.name}`}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+        {incomes.length === 0 && !adding && (
+          <p className="py-4 text-sm text-[#3d4d50]">No income sources yet — add yours below.</p>
+        )}
+      </div>
+
+      {adding ? (
+        <div className="mt-4 rounded-[16px] bg-[#ddedf0]/50 p-4 space-y-2.5">
+          <input
+            autoFocus value={name} onChange={(e) => setName(e.target.value)}
+            placeholder="Source, e.g. Acme Corp — Salary"
+            className="w-full rounded-[12px] bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 ring-[#0f5257]"
+          />
+          <div className="flex gap-2">
+            <input
+              value={owner} onChange={(e) => setOwner(e.target.value)}
+              placeholder="Owner, e.g. Alex"
+              className="flex-1 rounded-[12px] bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 ring-[#0f5257]"
+            />
+            <input
+              type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)}
+              placeholder="$ / month"
+              className="w-32 rounded-[12px] bg-white px-4 py-2.5 text-sm tnum outline-none focus:ring-2 ring-[#0f5257]"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[...owners, 'Joint'].map((o) => (
+              <button
+                key={o}
+                onClick={() => setOwner(o)}
+                className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                  owner === o ? 'bg-[#0e1a1c] text-[#ddedf0] border-[#0e1a1c]' : 'border-[#c4dbe0] text-[#3d4d50] hover:border-[#0e1a1c]'
+                }`}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={submit} className="rounded-full bg-[#0f5257] text-white text-sm font-semibold px-5 py-2 hover:bg-[#0e1a1c] transition-colors">Add income</button>
+            <button onClick={() => setAdding(false)} className="rounded-full bg-white text-sm font-medium px-5 py-2"><X size={14} className="inline mr-1" />Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#0f5257] underline underline-offset-4 hover:text-[#0e1a1c]"
+        >
+          <Plus size={15} /> add income source
+        </button>
+      )}
+    </div>
+  )
+}
+
 /** Accordion-style bucket groups with editable per-category limits. */
 export function Budget({ month }: { month: string }) {
   const { categories, setLimit } = useBudget()
-  const { byCategory, spent } = useMonthSpend(month)
+  const { byCategory, spent, earned } = useMonthSpend(month)
   const [open, setOpen] = useState<Record<Bucket, boolean>>({ fixed: true, flexible: true, nonmonthly: true })
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
@@ -24,6 +133,8 @@ export function Budget({ month }: { month: string }) {
 
   return (
     <div className="space-y-4">
+      <IncomeSection earned={earned} />
+
       <div data-animation="fade-in-up" className="rounded-[20px] bg-[#0e1a1c] text-[#ddedf0] p-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Total monthly budget</div>

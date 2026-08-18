@@ -19,6 +19,13 @@ export interface Transaction {
   recurring?: boolean
 }
 
+export interface IncomeSource {
+  id: string
+  name: string
+  owner: string // person's name, or "Joint"
+  amount: number // expected per month
+}
+
 export interface Goal {
   id: string
   name: string
@@ -33,6 +40,7 @@ export interface BudgetState {
   transactions: Transaction[]
   categories: Category[]
   goals: Goal[]
+  incomes: IncomeSource[]
   monthlyIncome: number
 }
 
