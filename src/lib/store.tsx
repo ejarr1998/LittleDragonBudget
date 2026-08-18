@@ -97,6 +97,7 @@ interface Store extends BudgetState {
   syncStatus: SyncStatus
   addTransaction: (t: Omit<Transaction, 'id' | 'categoryId'> & { categoryId?: string }) => void
   deleteTransaction: (id: string) => void
+  recategorize: (id: string, categoryId: string) => void
   importTransactions: (rows: { date: string; merchant: string; amount: number }[]) => { added: number; importId: string }
   undoImport: (importId: string) => number
   setLimit: (categoryId: string, limit: number) => void
@@ -168,6 +169,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         .sort((a, b) => b.date.localeCompare(a.date)),
     })),
     deleteTransaction: (id) => setState((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== id) })),
+    recategorize: (id, categoryId) => setState((s) => ({
+      ...s, transactions: s.transactions.map((t) => (t.id === id ? { ...t, categoryId } : t)),
+    })),
     importTransactions: (rows) => {
       const importId = uid()
       let added = 0
