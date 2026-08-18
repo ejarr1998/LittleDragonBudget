@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Plus, MoreVertical, RotateCcw, Eraser, Maximize, Minimize } from 'lucide-react'
+import { Plus, MoreVertical, Eraser, Maximize, Minimize } from 'lucide-react'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { BudgetProvider, useBudget } from '@/lib/store'
 import { monthKey } from '@/lib/money'
@@ -30,7 +30,7 @@ function Shell() {
   const [month, setMonth] = useState(monthKey(new Date()))
   const [addOpen, setAddOpen] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const { resetDemo, startFresh } = useBudget()
+  const { startFresh } = useBudget()
 
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement)
@@ -85,13 +85,6 @@ function Shell() {
                     className="gap-2 text-[#c0564b] focus:text-[#c0564b]"
                   >
                     <Eraser size={15} /> Start fresh — clear all data
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => { if (confirm('Load demo data? This replaces everything with sample transactions.')) resetDemo() }}
-                    className="gap-2"
-                  >
-                    <RotateCcw size={15} /> Load demo data
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

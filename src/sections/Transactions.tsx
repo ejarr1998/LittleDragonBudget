@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { ArrowDownLeft, Trash2, Upload, Repeat } from 'lucide-react'
 import { useBudget } from '@/lib/store'
 import { fmt, monthKey, parseCSV } from '@/lib/money'
+import { parseStatementPDF } from '@/lib/pdf'
 import { CategoryIcon } from '@/components/app/ui'
 
 type Filter = 'all' | 'expense' | 'income'
@@ -24,12 +25,33 @@ export function Transactions({ month }: { month: string }) {
     return true
   }), [monthTxns, filter, categoryId, query])
 
+  const [parsing, setParsing] = useState(false)
+
   const onFile = async (f: File) => {
-    const text = await f.text()
-    const { rows, skipped } = parseCSV(text)
-    const added = importTransactions(rows)
-    setImportMsg(`Imported ${added} new transaction${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} unreadable row${skipped === 1 ? '' : 's'}` : ''}${rows.length - added > 0 ? `, ${rows.length - added} already existed` : ''}.`)
-    setTimeout(() => setImportMsg(null), 8000)
+    setParsing(true)
+    try {
+      let rows: { date: string; merchant: string; amount: number }[]
+      let skipped = 0
+      if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') {
+        const res = await parseStatementPDF(f)
+        rows = res.rows; skipped = res.skipped
+      } else {
+        const res = parseCSV(await f.text())
+        rows = res.rows; skipped = res.skipped
+      }
+      const added = importTransactions(rows)
+      setImportMsg(
+        rows.length === 0
+          ? 'No transactions could be read from that file — try Wells Fargo’s CSV download instead (see note).'
+          : `Imported ${added} new transaction${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} unreadable row${skipped === 1 ? '' : 's'}` : ''}${rows.length - added > 0 ? `, ${rows.length - added} already existed` : ''}. Double-check the categories below.`
+      )
+      setTimeout(() => setImportMsg(null), 10000)
+    } catch {
+      setImportMsg('Could not read that file. A CSV export from your bank is the most reliable option.')
+      setTimeout(() => setImportMsg(null), 10000)
+    } finally {
+      setParsing(false)
+    }
   }
 
   const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? 'Uncategorized'
@@ -43,20 +65,22 @@ export function Transactions({ month }: { month: string }) {
         <div className="flex-1 min-w-[240px]">
           <h3 className="font-display text-xl">Connect your bank</h3>
           <p className="text-sm text-[#9fc3c9] mt-1.5 leading-relaxed max-w-lg">
-            Live bank linking needs a licensed aggregator (Plaid, MX) with server-side credentials, so it isn't
-            available in this app. The reliable path: export a CSV statement from your bank and drop it here —
-            Clover auto-categorizes every row and skips duplicates.
+            Live bank linking needs a licensed aggregator (Plaid, MX), so imports are file-based.
+            <strong className="text-[#ddedf0]"> Easiest with Wells Fargo:</strong> open your account →
+            <em> Download Account Activity</em> → choose <em>Comma Delimited (CSV)</em> — that imports flawlessly.
+            A PDF statement works too (we extract and auto-categorize each line), but CSV is more accurate.
           </p>
           {importMsg && <p className="mt-2 text-sm text-[#2a9aa2] font-medium">{importMsg}</p>}
         </div>
         <button
           onClick={() => fileRef.current?.click()}
-          className="flex items-center gap-2 rounded-full bg-[#c4dbe0] text-[#0e1a1c] font-semibold text-sm px-5 py-3 hover:bg-[#ddedf0] transition-colors"
+          disabled={parsing}
+          className="flex items-center gap-2 rounded-full bg-[#c4dbe0] text-[#0e1a1c] font-semibold text-sm px-5 py-3 hover:bg-[#ddedf0] transition-colors disabled:opacity-50"
         >
-          <Upload size={16} /> Import bank CSV
+          <Upload size={16} /> {parsing ? 'Reading file…' : 'Import CSV or PDF'}
         </button>
         <input
-          ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
+          ref={fileRef} type="file" accept=".csv,.pdf,text/csv,application/pdf" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }}
         />
       </div>

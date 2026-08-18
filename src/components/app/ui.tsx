@@ -36,7 +36,7 @@ export function SegBar({ pct, color, segments = 24 }: { pct: number; color: stri
 }
 
 /** Donut chart of spending by category. */
-export function Donut({ data, total }: { data: { label: string; value: number; color: string }[]; total: number }) {
+export function Donut({ data, total, centerLabel = 'spent' }: { data: { label: string; value: number; color: string }[]; total: number; centerLabel?: string }) {
   const R = 42, C = 2 * Math.PI * R
   let acc = 0
   const slices = data.filter((d) => d.value > 0)
@@ -62,7 +62,7 @@ export function Donut({ data, total }: { data: { label: string; value: number; c
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-[#3d4d50]">spent</div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-[#3d4d50]">{centerLabel}</div>
         <div className="font-display text-2xl tnum">{fmt(total)}</div>
       </div>
     </div>

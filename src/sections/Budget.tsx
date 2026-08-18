@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Minus, Plus, Check, Pencil, Trash2, Users, User, X } from 'lucide-react'
 import { useBudget, useMonthSpend } from '@/lib/store'
 import { fmt } from '@/lib/money'
-import { CategoryIcon, SegBar } from '@/components/app/ui'
+import { CategoryIcon, Donut, SegBar } from '@/components/app/ui'
 import { BUCKET_DESCRIPTIONS, BUCKET_LABELS, type Bucket } from '@/types'
 
 /** Income sources — individual or joint. */
@@ -134,6 +134,31 @@ export function Budget({ month }: { month: string }) {
   return (
     <div className="space-y-4">
       <IncomeSection earned={earned} />
+
+      {/* Budget allocation donut — how the plan is divided, not what's spent */}
+      {totalLimit > 0 && (
+        <div data-animation="fade-in-up" style={{ animationDelay: '40ms' }} className="rounded-[20px] bg-white p-6">
+          <h3 className="font-display text-xl">Your budget, divided up</h3>
+          <p className="text-xs text-[#3d4d50] mt-0.5">Each sliver is a category's share of your total monthly plan.</p>
+          <div className="mt-5 grid sm:grid-cols-2 gap-6 items-center">
+            <Donut
+              data={budgeted.map((c) => ({ label: c.name, value: c.limit, color: c.color }))}
+              total={totalLimit}
+              centerLabel="planned"
+            />
+            <div className="space-y-2.5">
+              {[...budgeted].sort((a, b) => b.limit - a.limit).map((c) => (
+                <div key={c.id} className="flex items-center gap-2.5 text-sm">
+                  <span className="w-2.5 h-2.5 rounded-[4px] shrink-0" style={{ background: c.color }} />
+                  <span className="flex-1 truncate">{c.name}</span>
+                  <span className="font-mono-num text-xs text-[#3d4d50]">{Math.round((c.limit / totalLimit) * 100)}%</span>
+                  <span className="font-mono-num text-xs w-16 text-right">{fmt(c.limit)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div data-animation="fade-in-up" className="rounded-[20px] bg-[#0e1a1c] text-[#ddedf0] p-6 flex flex-wrap items-end justify-between gap-4">
         <div>

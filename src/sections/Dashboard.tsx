@@ -6,7 +6,7 @@ import { CategoryIcon, Donut, SegBar, StatCard, TrendBars } from '@/components/a
 import type { View } from '@/components/app/Chrome'
 
 export function Dashboard({ month, go }: { month: string; go: (v: View) => void }) {
-  const { categories, transactions: allTxns, resetDemo } = useBudget()
+  const { categories, transactions: allTxns } = useBudget()
   const isEmpty = allTxns.length === 0
   const { txns, spent, earned, byCategory } = useMonthSpend(month)
   const isCurrent = month === monthKey(new Date())
@@ -70,7 +70,7 @@ export function Dashboard({ month, go }: { month: string; go: (v: View) => void 
         <h2 className="font-display text-3xl mt-4">A clean slate</h2>
         <p className="text-sm text-[#3d4d50] leading-relaxed mt-3 max-w-sm mx-auto">
           No transactions yet. Add your first one with the <strong>+ button</strong> above,
-          import a bank CSV from <strong>Transactions</strong>, or load the demo data to explore.
+          or import a bank statement (CSV or PDF) from <strong>Transactions</strong>.
         </p>
         <div className="flex flex-wrap justify-center gap-3 mt-6">
           <button
@@ -78,12 +78,6 @@ export function Dashboard({ month, go }: { month: string; go: (v: View) => void 
             className="rounded-full bg-[#0f5257] text-white font-semibold text-sm px-6 py-3 hover:bg-[#0e1a1c] transition-colors"
           >
             Start tracking
-          </button>
-          <button
-            onClick={resetDemo}
-            className="rounded-full bg-[#ddedf0] text-[#0e1a1c] font-semibold text-sm px-6 py-3 hover:bg-[#c4dbe0] transition-colors"
-          >
-            Load demo data
           </button>
         </div>
       </div>
