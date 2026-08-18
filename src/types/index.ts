@@ -17,6 +17,7 @@ export interface Transaction {
   amount: number // positive = expense, negative = income
   note?: string
   recurring?: boolean
+  importId?: string // batch tag for undoing imports
 }
 
 export interface IncomeSource {

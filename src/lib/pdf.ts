@@ -45,6 +45,8 @@ export async function parseStatementPDF(file: File): Promise<{ rows: ParsedRow[]
   const rows: ParsedRow[] = []
   let skipped = 0
   let section: 'deposits' | 'withdrawals' | null = null
+  // If the document uses section headers at all, only trust lines inside a section.
+  const sawSections = lines.some((l) => /^(deposits|withdrawals|debits|credits|purchases)\b/i.test(l.trim()))
 
   const txRe = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s+(.+?)\s+(-?\$?[\d,]+\.\d{2})\s*$/
 
@@ -52,16 +54,19 @@ export async function parseStatementPDF(file: File): Promise<{ rows: ParsedRow[]
     const l = raw.trim()
     if (/^(deposits|credits|money in)\b/i.test(l)) { section = 'deposits'; continue }
     if (/^(withdrawals|debits|purchases|money out|checks paid|electronic withdrawals)\b/i.test(l)) { section = 'withdrawals'; continue }
-    if (/^(totals?|ending balance|beginning balance|summary|page \d)/i.test(l)) continue
+    if (/^(totals?|ending balance|beginning balance|summary|page \d)/i.test(l)) { section = null; continue }
+
+    if (sawSections && section === null) continue // outside any transaction table — skip headers/footers/summaries
 
     const m = l.match(txRe)
     if (!m) continue
     const [, mm, dd, yy, desc, amtRaw] = m
+    if (parseInt(mm) > 12 || parseInt(dd) > 31) { skipped++; continue }
     const y = yy ? (yy.length === 2 ? 2000 + parseInt(yy) : parseInt(yy)) : year
     const amount = Math.abs(parseFloat(amtRaw.replace(/[$,]/g, '')))
     if (!amount || amount > 1_000_000) { skipped++; continue }
     const merchant = desc.replace(/\s+/g, ' ').trim().slice(0, 60) || 'Unknown'
-    if (/^(balance|total|date|description)/i.test(merchant)) { skipped++; continue }
+    if (merchant.length < 3 || /^(balance|total|date|description|\d)/i.test(merchant)) { skipped++; continue }
     const date = `${y}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
     // Convention: expenses positive, income negative. Section header wins;
     // otherwise explicit minus sign in the statement means money in.

@@ -97,7 +97,8 @@ interface Store extends BudgetState {
   syncStatus: SyncStatus
   addTransaction: (t: Omit<Transaction, 'id' | 'categoryId'> & { categoryId?: string }) => void
   deleteTransaction: (id: string) => void
-  importTransactions: (rows: { date: string; merchant: string; amount: number }[]) => number
+  importTransactions: (rows: { date: string; merchant: string; amount: number }[]) => { added: number; importId: string }
+  undoImport: (importId: string) => number
   setLimit: (categoryId: string, limit: number) => void
   addIncome: (i: Omit<IncomeSource, 'id'>) => void
   deleteIncome: (id: string) => void
@@ -168,6 +169,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     })),
     deleteTransaction: (id) => setState((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== id) })),
     importTransactions: (rows) => {
+      const importId = uid()
       let added = 0
       setState((s) => {
         const seen = new Set(s.transactions.map((t) => `${t.date}|${t.merchant}|${t.amount}`))
@@ -175,11 +177,19 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
         added = fresh.length
         return {
           ...s,
-          transactions: [...fresh.map((r) => ({ ...r, id: uid(), categoryId: categorize(r.merchant, s.categories) })), ...s.transactions]
+          transactions: [...fresh.map((r) => ({ ...r, id: uid(), importId, categoryId: categorize(r.merchant, s.categories) })), ...s.transactions]
             .sort((a, b) => b.date.localeCompare(a.date)),
         }
       })
-      return added
+      return { added, importId }
+    },
+    undoImport: (importId) => {
+      let removed = 0
+      setState((s) => {
+        removed = s.transactions.filter((t) => t.importId === importId).length
+        return { ...s, transactions: s.transactions.filter((t) => t.importId !== importId) }
+      })
+      return removed
     },
     setLimit: (categoryId, limit) => setState((s) => ({
       ...s, categories: s.categories.map((c) => (c.id === categoryId ? { ...c, limit } : c)),

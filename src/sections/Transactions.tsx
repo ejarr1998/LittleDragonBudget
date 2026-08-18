@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { ArrowDownLeft, Trash2, Upload, Repeat } from 'lucide-react'
+import { ArrowDownLeft, Trash2, Upload, Repeat, Undo2 } from 'lucide-react'
 import { useBudget } from '@/lib/store'
 import { fmt, monthKey, parseCSV } from '@/lib/money'
 import { parseStatementPDF } from '@/lib/pdf'
@@ -8,7 +8,7 @@ import { CategoryIcon } from '@/components/app/ui'
 type Filter = 'all' | 'expense' | 'income'
 
 export function Transactions({ month }: { month: string }) {
-  const { transactions, categories, deleteTransaction, importTransactions } = useBudget()
+  const { transactions, categories, deleteTransaction, importTransactions, undoImport } = useBudget()
   const [filter, setFilter] = useState<Filter>('all')
   const [categoryId, setCategoryId] = useState('all')
   const [query, setQuery] = useState('')
@@ -26,6 +26,7 @@ export function Transactions({ month }: { month: string }) {
   }), [monthTxns, filter, categoryId, query])
 
   const [parsing, setParsing] = useState(false)
+  const [lastImport, setLastImport] = useState<{ importId: string; added: number } | null>(null)
 
   const onFile = async (f: File) => {
     setParsing(true)
@@ -39,19 +40,25 @@ export function Transactions({ month }: { month: string }) {
         const res = parseCSV(await f.text())
         rows = res.rows; skipped = res.skipped
       }
-      const added = importTransactions(rows)
+      const { added, importId } = importTransactions(rows)
+      if (added > 0) setLastImport({ importId, added })
       setImportMsg(
         rows.length === 0
-          ? 'No transactions could be read from that file — try Wells Fargo’s CSV download instead (see note).'
-          : `Imported ${added} new transaction${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} unreadable row${skipped === 1 ? '' : 's'}` : ''}${rows.length - added > 0 ? `, ${rows.length - added} already existed` : ''}. Double-check the categories below.`
+          ? 'No transactions could be read from that file — the CSV download (desktop browser) is far more reliable.'
+          : `Imported ${added} new transaction${added === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} unreadable row${skipped === 1 ? '' : 's'}` : ''}${rows.length - added > 0 ? `, ${rows.length - added} already existed` : ''}. Double-check the categories — or undo the whole import below.`
       )
-      setTimeout(() => setImportMsg(null), 10000)
     } catch {
       setImportMsg('Could not read that file. A CSV export from your bank is the most reliable option.')
-      setTimeout(() => setImportMsg(null), 10000)
     } finally {
       setParsing(false)
     }
+  }
+
+  const onUndoImport = () => {
+    if (!lastImport) return
+    undoImport(lastImport.importId)
+    setImportMsg(`Removed all ${lastImport.added} transactions from that import.`)
+    setLastImport(null)
   }
 
   const catName = (id: string) => categories.find((c) => c.id === id)?.name ?? 'Uncategorized'
@@ -65,12 +72,21 @@ export function Transactions({ month }: { month: string }) {
         <div className="flex-1 min-w-[240px]">
           <h3 className="font-display text-xl">Connect your bank</h3>
           <p className="text-sm text-[#9fc3c9] mt-1.5 leading-relaxed max-w-lg">
-            Live bank linking needs a licensed aggregator (Plaid, MX), so imports are file-based.
-            <strong className="text-[#ddedf0]"> Easiest with Wells Fargo:</strong> open your account →
-            <em> Download Account Activity</em> → choose <em>Comma Delimited (CSV)</em> — that imports flawlessly.
-            A PDF statement works too (we extract and auto-categorize each line), but CSV is more accurate.
+            <strong className="text-[#ddedf0]">Best option — Wells Fargo CSV (desktop browser only, not the app):</strong>{' '}
+            wellsfargo.com → open the account → <em>Download Account Activity</em> → pick a{' '}
+            <strong className="text-[#ddedf0]">custom date range (up to 18 months)</strong> → format{' '}
+            <em>Comma Delimited</em>. One file can cover many months, and every row imports cleanly.
+            PDF statements also work here, but they're one month per file and parsing is best-effort.
           </p>
           {importMsg && <p className="mt-2 text-sm text-[#2a9aa2] font-medium">{importMsg}</p>}
+          {lastImport && (
+            <button
+              onClick={onUndoImport}
+              className="mt-3 flex items-center gap-2 rounded-full bg-[#c0564b] text-white font-semibold text-xs px-4 py-2 hover:bg-[#a0402f] transition-colors"
+            >
+              <Undo2 size={14} /> Undo last import ({lastImport.added} transactions)
+            </button>
+          )}
         </div>
         <button
           onClick={() => fileRef.current?.click()}
