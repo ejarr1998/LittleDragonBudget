@@ -1,5 +1,6 @@
-import { LayoutDashboard, Wallet, ArrowLeftRight, Sparkles, Target, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { LayoutDashboard, Wallet, ArrowLeftRight, Sparkles, Target, ChevronLeft, ChevronRight, Plus, Cloud, CloudOff, Loader2 } from 'lucide-react'
 import { monthLabel, shiftMonth, monthKey } from '@/lib/money'
+import { useBudget } from '@/lib/store'
 
 export type View = 'dashboard' | 'budget' | 'transactions' | 'insights' | 'goals'
 
@@ -48,10 +49,28 @@ export function Sidebar({ view, setView, onAdd }: { view: View; setView: (v: Vie
       >
         <Plus size={16} strokeWidth={2.5} /> Add transaction
       </button>
-      <p className="mt-4 px-1 text-[10px] leading-relaxed text-[#5f7d82]">
-        Data stays in this browser. Import a bank CSV from Transactions.
+      <SyncBadge />
+      <p className="mt-3 px-1 text-[10px] leading-relaxed text-[#5f7d82]">
+        Import a bank CSV from Transactions to bring in real statements.
       </p>
     </aside>
+  )
+}
+
+function SyncBadge() {
+  const { syncStatus } = useBudget()
+  const map = {
+    connecting: { icon: Loader2, text: 'Connecting to cloud…', cls: 'text-[#9fc3c9]', spin: true },
+    synced: { icon: Cloud, text: 'Synced to LittleDragonBudget', cls: 'text-[#2a9aa2]', spin: false },
+    offline: { icon: CloudOff, text: 'Cloud save failed — kept locally', cls: 'text-[#e0a35e]', spin: false },
+    'local-only': { icon: CloudOff, text: 'Offline — saved in this browser', cls: 'text-[#5f7d82]', spin: false },
+  } as const
+  const s = map[syncStatus]
+  return (
+    <div className={`mt-4 px-1 flex items-center gap-2 text-[10px] ${s.cls}`}>
+      <s.icon size={12} className={s.spin ? 'animate-spin' : ''} />
+      {s.text}
+    </div>
   )
 }
 

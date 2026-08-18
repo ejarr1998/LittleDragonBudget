@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BudgetState, Category, Goal, Transaction } from '@/types'
 import { categorize, monthKey, uid } from '@/lib/money'
+import { loadRemote, saveRemote, type SyncStatus } from '@/lib/firebase'
 
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'rent', name: 'Rent', bucket: 'fixed', limit: 1650, color: '#0f5257', icon: 'home' },
@@ -92,6 +93,7 @@ function seedState(): BudgetState {
 const KEY = 'clover-budget-v1'
 
 interface Store extends BudgetState {
+  syncStatus: SyncStatus
   addTransaction: (t: Omit<Transaction, 'id' | 'categoryId'> & { categoryId?: string }) => void
   deleteTransaction: (id: string) => void
   importTransactions: (rows: { date: string; merchant: string; amount: number }[]) => number
@@ -116,12 +118,44 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     return seedState()
   })
 
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting')
+  const uidRef = useRef<string | null>(null)
+  const hydratedRef = useRef(false)
+
+  // On mount: sign in anonymously and hydrate from Firestore (fall back to local).
+  useEffect(() => {
+    let cancelled = false
+    loadRemote()
+      .then(({ uid: remoteUid, state: remote }) => {
+        if (cancelled) return
+        uidRef.current = remoteUid
+        if (remote?.transactions?.length && remote?.categories?.length) {
+          setState(remote)
+        } else if (remote === null) {
+          // First sign-in on a fresh account: push the local seed up.
+          saveRemote(remoteUid, JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? state, () => setSyncStatus('offline'))
+        }
+        hydratedRef.current = true
+        setSyncStatus('synced')
+      })
+      .catch(() => {
+        if (!cancelled) { hydratedRef.current = true; setSyncStatus('local-only') }
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify(state)) } catch { /* storage full */ }
+    if (hydratedRef.current && uidRef.current) {
+      setSyncStatus((s) => (s === 'synced' ? 'synced' : s))
+      saveRemote(uidRef.current, state, () => setSyncStatus('offline'))
+    }
   }, [state])
 
   const store = useMemo<Store>(() => ({
     ...state,
+    syncStatus,
     addTransaction: (t) => setState((s) => ({
       ...s,
       transactions: [{ ...t, id: uid(), categoryId: t.categoryId ?? categorize(t.merchant, s.categories) }, ...s.transactions]
@@ -151,7 +185,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     })),
     deleteGoal: (id) => setState((s) => ({ ...s, goals: s.goals.filter((g) => g.id !== id) })),
     resetDemo: () => setState(seedState()),
-  }), [state])
+  }), [state, syncStatus])
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }
