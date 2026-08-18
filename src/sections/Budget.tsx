@@ -6,6 +6,11 @@ import { CategoryIcon, Donut, SegBar } from '@/components/app/ui'
 import { BUCKET_DESCRIPTIONS, BUCKET_LABELS, type Bucket } from '@/types'
 
 /** Income sources — individual or joint. */
+export function useExpectedIncome() {
+  const { incomes } = useBudget()
+  return incomes.reduce((s, i) => s + i.amount, 0)
+}
+
 function IncomeSection({ earned }: { earned: number }) {
   const { incomes, addIncome, deleteIncome } = useBudget()
   const [adding, setAdding] = useState(false)
@@ -117,6 +122,7 @@ function IncomeSection({ earned }: { earned: number }) {
 /** Accordion-style bucket groups with editable per-category limits. */
 export function Budget({ month }: { month: string }) {
   const { categories, setLimit } = useBudget()
+  const expectedIncome = useExpectedIncome()
   const { byCategory, spent, earned } = useMonthSpend(month)
   const [open, setOpen] = useState<Record<Bucket, boolean>>({ fixed: true, flexible: true, nonmonthly: true })
   const [editing, setEditing] = useState<string | null>(null)
@@ -135,30 +141,59 @@ export function Budget({ month }: { month: string }) {
     <div className="space-y-4">
       <IncomeSection earned={earned} />
 
-      {/* Budget allocation donut — how the plan is divided, not what's spent */}
-      {totalLimit > 0 && (
-        <div data-animation="fade-in-up" style={{ animationDelay: '40ms' }} className="rounded-[20px] bg-white p-6">
-          <h3 className="font-display text-xl">Your budget, divided up</h3>
-          <p className="text-xs text-[#3d4d50] mt-0.5">Each sliver is a category's share of your total monthly plan.</p>
-          <div className="mt-5 grid sm:grid-cols-2 gap-6 items-center">
-            <Donut
-              data={budgeted.map((c) => ({ label: c.name, value: c.limit, color: c.color }))}
-              total={totalLimit}
-              centerLabel="planned"
-            />
-            <div className="space-y-2.5">
-              {[...budgeted].sort((a, b) => b.limit - a.limit).map((c) => (
-                <div key={c.id} className="flex items-center gap-2.5 text-sm">
-                  <span className="w-2.5 h-2.5 rounded-[4px] shrink-0" style={{ background: c.color }} />
-                  <span className="flex-1 truncate">{c.name}</span>
-                  <span className="font-mono-num text-xs text-[#3d4d50]">{Math.round((c.limit / totalLimit) * 100)}%</span>
-                  <span className="font-mono-num text-xs w-16 text-right">{fmt(c.limit)}</span>
-                </div>
-              ))}
+      {/* Income pie — the whole circle is your monthly income; slivers are allocations */}
+      {totalLimit > 0 && (() => {
+        const leftover = Math.max(0, expectedIncome - totalLimit)
+        const overBy = Math.max(0, totalLimit - expectedIncome)
+        const pieTotal = Math.max(expectedIncome, totalLimit)
+        const data = [
+          ...budgeted.map((c) => ({ label: c.name, value: c.limit, color: c.color })),
+          ...(expectedIncome > 0 && leftover > 0
+            ? [{ label: 'Left over (unassigned)', value: leftover, color: 'rgba(14,26,28,0.14)' }]
+            : []),
+        ]
+        return (
+          <div data-animation="fade-in-up" style={{ animationDelay: '40ms' }} className="rounded-[20px] bg-white p-6">
+            <h3 className="font-display text-xl">Your income, divided up</h3>
+            <p className="text-xs text-[#3d4d50] mt-0.5">
+              {expectedIncome > 0
+                ? `The whole circle is your ${fmt(expectedIncome)} monthly income — each sliver is what you've assigned to a category.`
+                : 'Add income sources above and each sliver will show its share of your paycheck.'}
+            </p>
+            {overBy > 0 && (
+              <p className="mt-3 rounded-[12px] bg-[#c0564b]/10 text-[#c0564b] text-xs font-medium px-4 py-2.5">
+                Your budget assigns {fmt(overBy)} more than you make — trim a category or raise an income source.
+              </p>
+            )}
+            <div className="mt-5 grid sm:grid-cols-2 gap-6 items-center">
+              <Donut data={data} total={pieTotal} centerLabel={expectedIncome > 0 ? 'income' : 'planned'} />
+              <div className="space-y-2.5">
+                {[...budgeted].sort((a, b) => b.limit - a.limit).map((c) => (
+                  <div key={c.id} className="flex items-center gap-2.5 text-sm">
+                    <span className="w-2.5 h-2.5 rounded-[4px] shrink-0" style={{ background: c.color }} />
+                    <span className="flex-1 truncate">{c.name}</span>
+                    <span className="font-mono-num text-xs text-[#3d4d50]">{Math.round((c.limit / pieTotal) * 100)}%</span>
+                    <span className="font-mono-num text-xs w-16 text-right">{fmt(c.limit)}</span>
+                  </div>
+                ))}
+                {expectedIncome > 0 && leftover > 0 && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <span className="w-2.5 h-2.5 rounded-[4px] shrink-0" style={{ background: 'rgba(14,26,28,0.14)' }} />
+                    <span className="flex-1 truncate text-[#3d4d50]">Left over (unassigned)</span>
+                    <span className="font-mono-num text-xs text-[#3d4d50]">{Math.round((leftover / pieTotal) * 100)}%</span>
+                    <span className="font-mono-num text-xs w-16 text-right">{fmt(leftover)}</span>
+                  </div>
+                )}
+              </div>
             </div>
+            {expectedIncome > 0 && leftover > 0 && (
+              <p className="mt-4 text-[11px] text-[#3d4d50] leading-relaxed">
+                Tip: give every dollar a job — sweep the left-over sliver into a Goal at the end of the month.
+              </p>
+            )}
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       <div data-animation="fade-in-up" className="rounded-[20px] bg-[#0e1a1c] text-[#ddedf0] p-6 flex flex-wrap items-end justify-between gap-4">
         <div>
