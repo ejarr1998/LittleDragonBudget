@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Minus, Plus, Check, Pencil, Trash2, Users, User, X } from 'lucide-react'
+import { Minus, Plus, Check, Pencil, Trash2, Users, User, X, Wallet } from 'lucide-react'
 import { useBudget, useMonthSpend } from '@/lib/store'
 import { fmt } from '@/lib/money'
 import { CategoryIcon, Donut, SegBar } from '@/components/app/ui'
@@ -28,37 +28,48 @@ function IncomeSection({ earned }: { earned: number }) {
   }
 
   return (
-    <div data-animation="fade-in-up" className="rounded-[20px] bg-white p-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
+    <div data-animation="fade-in-up" className="rounded-[20px] bg-white p-5 sm:p-6">
+      <div className="flex items-center gap-2.5">
+        <span className="p-2 rounded-full bg-[#1f7a4d]/10 text-[#1f7a4d]"><Wallet size={15} /></span>
         <div>
-          <h3 className="font-display text-xl">Income</h3>
-          <p className="text-xs text-[#3d4d50] mt-0.5">Who brings in what — individual or joint.</p>
-        </div>
-        <div className="text-right">
-          <div className="font-mono-num text-sm">{fmt(earned)} <span className="text-[#3d4d50]">received of</span> {fmt(expected)}</div>
-          <div className="text-[11px] text-[#3d4d50] mt-0.5">expected this month</div>
+          <h3 className="font-display text-xl leading-tight">Income</h3>
+          <p className="text-xs text-[#3d4d50]">Who brings in what — individual or joint.</p>
         </div>
       </div>
+
       {expected > 0 && (
-        <div className="mt-4">
-          <SegBar pct={earned / expected} color="#1f7a4d" segments={30} />
+        <div className="mt-4 rounded-[16px] bg-[#eef6f7] px-5 py-4">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="font-display text-3xl tnum text-[#1f7a4d]">{fmt(earned)}</span>
+            <span className="text-xs text-[#3d4d50]">received of</span>
+            <span className="font-display text-lg tnum">{fmt(expected)}</span>
+            <span className="text-xs text-[#3d4d50]">expected this month</span>
+            <span className="ml-auto font-mono-num text-xs text-[#3d4d50]">{Math.round((earned / expected) * 100)}%</span>
+          </div>
+          <div className="mt-3">
+            <SegBar pct={earned / expected} color="#1f7a4d" segments={30} />
+          </div>
         </div>
       )}
 
-      <div className="mt-4 divide-y divide-[#eef6f7]">
+      <div className="mt-2 divide-y divide-[#eef6f7]">
         {incomes.map((i) => (
-          <div key={i.id} className="group flex items-center gap-3 py-3">
-            <span className={`p-2 rounded-full ${i.owner === 'Joint' ? 'bg-[#7a5aa8]/10 text-[#7a5aa8]' : 'bg-[#1f7a4d]/10 text-[#1f7a4d]'}`}>
+          <div key={i.id} className="group flex items-center gap-3 py-3.5">
+            <span className={`p-2.5 rounded-full shrink-0 ${i.owner === 'Joint' ? 'bg-[#7a5aa8]/10 text-[#7a5aa8]' : 'bg-[#1f7a4d]/10 text-[#1f7a4d]'}`}>
               {i.owner === 'Joint' ? <Users size={15} /> : <User size={15} />}
             </span>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium truncate">{i.name}</div>
-              <div className="text-[11px] text-[#3d4d50]">{i.owner}</div>
+              <div className="text-[11px] text-[#3d4d50] mt-0.5">
+                <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${i.owner === 'Joint' ? 'bg-[#7a5aa8]/10 text-[#7a5aa8]' : 'bg-[#ddedf0] text-[#0f5257]'}`}>
+                  {i.owner}
+                </span>
+              </div>
             </div>
-            <span className="font-mono-num text-sm">{fmt(i.amount)}/mo</span>
+            <span className="font-mono-num text-sm shrink-0">{fmt(i.amount)}<span className="text-[#7a9aa0] text-xs">/mo</span></span>
             <button
               onClick={() => deleteIncome(i.id)}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#c0564b] hover:bg-[#c0564b]/10 transition-all"
+              className="sm:opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#c0564b] hover:bg-[#c0564b]/10 transition-all shrink-0"
               aria-label={`Delete ${i.name}`}
             >
               <Trash2 size={14} />
@@ -71,7 +82,7 @@ function IncomeSection({ earned }: { earned: number }) {
       </div>
 
       {adding ? (
-        <div className="mt-4 rounded-[16px] bg-[#ddedf0]/50 p-4 space-y-2.5">
+        <div className="mt-3 rounded-[16px] bg-[#ddedf0]/50 p-4 space-y-2.5">
           <input
             autoFocus value={name} onChange={(e) => setName(e.target.value)}
             placeholder="Source, e.g. Acme Corp — Salary"
@@ -110,7 +121,7 @@ function IncomeSection({ earned }: { earned: number }) {
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#0f5257] underline underline-offset-4 hover:text-[#0e1a1c]"
+          className="mt-3 flex items-center gap-2 rounded-full border border-dashed border-[#9fc3c9] text-sm font-semibold text-[#0f5257] px-4 py-2 hover:border-[#0f5257] hover:bg-[#ddedf0]/40 transition-colors"
         >
           <Plus size={15} /> add income source
         </button>
@@ -153,13 +164,22 @@ export function Budget({ month }: { month: string }) {
             : []),
         ]
         return (
-          <div data-animation="fade-in-up" style={{ animationDelay: '40ms' }} className="rounded-[20px] bg-white p-6">
-            <h3 className="font-display text-xl">Your income, divided up</h3>
-            <p className="text-xs text-[#3d4d50] mt-0.5">
-              {expectedIncome > 0
-                ? `The whole circle is your ${fmt(expectedIncome)} monthly income — each sliver is what you've assigned to a category.`
-                : 'Add income sources above and each sliver will show its share of your paycheck.'}
-            </p>
+          <div data-animation="fade-in-up" style={{ animationDelay: '40ms' }} className="rounded-[20px] bg-white p-5 sm:p-6">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="font-display text-xl">Your income, divided up</h3>
+                <p className="text-xs text-[#3d4d50] mt-0.5 max-w-md leading-relaxed">
+                  {expectedIncome > 0
+                    ? `The whole circle is your ${fmt(expectedIncome)} monthly income — each sliver is what you've assigned to a category.`
+                    : 'Add income sources above and each sliver will show its share of your paycheck.'}
+                </p>
+              </div>
+              {expectedIncome > 0 && leftover > 0 && (
+                <span className="rounded-full bg-[#eef6f7] px-3.5 py-1.5 text-[11px] font-semibold text-[#0f5257]">
+                  {fmt(leftover)} unassigned
+                </span>
+              )}
+            </div>
             {overBy > 0 && (
               <p className="mt-3 rounded-[12px] bg-[#c0564b]/10 text-[#c0564b] text-xs font-medium px-4 py-2.5">
                 Your budget assigns {fmt(overBy)} more than you make — trim a category or raise an income source.
@@ -195,17 +215,26 @@ export function Budget({ month }: { month: string }) {
         )
       })()}
 
-      <div data-animation="fade-in-up" className="rounded-[20px] bg-[#0e1a1c] text-[#ddedf0] p-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Total monthly budget</div>
-          <div className="font-display text-4xl tnum mt-1">{fmt(totalLimit)}</div>
+      {/* Total budget banner */}
+      <div data-animation="fade-in-up" className="rounded-[20px] bg-[#0e1a1c] text-[#ddedf0] p-5 sm:p-6">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Total monthly budget</div>
+            <div className="font-display text-4xl tnum mt-1.5">{fmt(totalLimit)}</div>
+          </div>
+          <img src="./dragon.png" alt="" className="w-11 h-11 object-contain opacity-90 hidden sm:block" />
+          <div className="text-right">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Spent so far</div>
+            <div className="font-display text-2xl tnum mt-1.5">{fmt(spent)}</div>
+          </div>
         </div>
-        <div className="text-right">
-          <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Spent so far</div>
-          <div className="font-display text-2xl tnum mt-1">{fmt(spent)}</div>
-        </div>
-        <div className="w-full">
-          <SegBar pct={totalLimit ? spent / totalLimit : 0} color="#2a9aa2" segments={40} />
+        <div className="mt-4 flex items-center gap-3">
+          <div className="flex-1">
+            <SegBar pct={totalLimit ? spent / totalLimit : 0} color="#2a9aa2" segments={40} />
+          </div>
+          <span className="font-mono-num text-xs text-[#9fc3c9] shrink-0">
+            {totalLimit ? `${Math.round((spent / totalLimit) * 100)}%` : '—'}
+          </span>
         </div>
       </div>
 
@@ -223,23 +252,30 @@ export function Budget({ month }: { month: string }) {
           >
             <button
               onClick={() => setOpen((o) => ({ ...o, [bucket]: !o[bucket] }))}
-              className="w-full flex items-center gap-4 px-6 py-5 text-left"
+              className="w-full px-5 sm:px-6 py-5 text-left"
             >
-              <span className="text-lg leading-none text-[#0f5257] w-5">{isOpen ? '—' : '+'}</span>
-              <div className="flex-1">
-                <div className="font-display text-lg">{BUCKET_LABELS[bucket]}</div>
-                <div className="text-xs text-[#3d4d50] mt-0.5">{BUCKET_DESCRIPTIONS[bucket]}</div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="font-mono-num text-sm">{fmt(bucketSpent)} <span className="text-[#3d4d50]">/ {fmt(bucketLimit)}</span></div>
-                <div className="text-[11px] text-[#3d4d50] mt-0.5">
-                  {bucketLimit ? `${Math.round((bucketSpent / bucketLimit) * 100)}% used` : 'no limits set'}
+              <div className="flex items-center gap-3 sm:gap-4">
+                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm leading-none shrink-0 transition-colors ${isOpen ? 'bg-[#0f5257] text-[#ddedf0]' : 'bg-[#ddedf0] text-[#0f5257]'}`}>
+                  {isOpen ? '—' : '+'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-display text-lg leading-tight">{BUCKET_LABELS[bucket]}</div>
+                  <div className="text-xs text-[#3d4d50] mt-0.5 truncate">{BUCKET_DESCRIPTIONS[bucket]}</div>
                 </div>
+                <div className="text-right shrink-0">
+                  <div className="font-mono-num text-sm">{fmt(bucketSpent)} <span className="text-[#3d4d50]">/ {fmt(bucketLimit)}</span></div>
+                  <div className="text-[11px] text-[#3d4d50] mt-0.5">
+                    {bucketLimit ? `${Math.round((bucketSpent / bucketLimit) * 100)}% used` : 'no limits set'}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 ml-10">
+                <SegBar pct={bucketLimit ? bucketSpent / bucketLimit : 0} color={bucketLimit && bucketSpent > bucketLimit ? '#c0564b' : '#0f5257'} segments={30} />
               </div>
             </button>
 
             {isOpen && (
-              <div className="px-6 pb-6 space-y-5">
+              <div className="px-5 sm:px-6 pb-6 space-y-5">
                 {cats.map((c) => {
                   const value = byCategory[c.id] ?? 0
                   const pct = c.limit ? value / c.limit : 0
@@ -247,8 +283,10 @@ export function Budget({ month }: { month: string }) {
                   return (
                     <div key={c.id}>
                       <div className="flex items-center gap-3 mb-2">
-                        <CategoryIcon icon={c.icon} color={c.color} />
-                        <span className="text-sm font-medium flex-1">{c.name}</span>
+                        <span className="p-1.5 rounded-full shrink-0" style={{ background: `${c.color}1a` }}>
+                          <CategoryIcon icon={c.icon} color={c.color} size={14} />
+                        </span>
+                        <span className="text-sm font-medium flex-1 truncate">{c.name}</span>
                         {isEditing ? (
                           <span className="flex items-center gap-1.5">
                             <input
@@ -262,7 +300,7 @@ export function Budget({ month }: { month: string }) {
                             </button>
                           </span>
                         ) : (
-                          <span className="flex items-center gap-2 text-sm">
+                          <span className="flex items-center gap-2 text-sm shrink-0">
                             <span className={`font-mono-num ${pct > 1 ? 'text-[#c0564b] font-semibold' : ''}`}>
                               {fmt(value)}
                             </span>
