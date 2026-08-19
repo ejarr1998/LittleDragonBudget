@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app'
 import {
   getAuth, onAuthStateChanged, signInAnonymously, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  browserPopupRedirectResolver, browserLocalPersistence,
   type Auth, type User,
 } from 'firebase/auth'
 import { doc, getDoc, getFirestore, setDoc, type Firestore } from 'firebase/firestore'
@@ -63,6 +64,15 @@ try {
   const app = initializeApp(firebaseConfig)
   auth = getAuth(app)
   db = getFirestore(app)
+  // The SDK stores the pending redirect sign-in in sessionStorage — which does NOT
+  // survive the round trip out to Google and back in an installed PWA (Android
+  // destroys/recreates the window). Switch the live resolver instance to
+  // localStorage so the result can always be picked up on return.
+  void browserPopupRedirectResolver // (class reference kept for clarity)
+  const resolverHolder = auth as unknown as { _popupRedirectResolver?: { _redirectPersistence?: unknown } }
+  if (resolverHolder._popupRedirectResolver) {
+    resolverHolder._popupRedirectResolver._redirectPersistence = browserLocalPersistence
+  }
 } catch {
   // Firebase unavailable (blocked network, bad config) — app falls back to local-only
 }
