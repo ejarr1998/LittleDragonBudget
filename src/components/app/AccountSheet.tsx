@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud, Download, FileUp } from 'lucide-react'
 import { useBudget } from '@/lib/store'
-import { getLastAuthError, getAuthLog, getRedirectPatchStatus, isIOSStandalone, openInSafariForSignIn } from '@/lib/firebase'
+import { getLastAuthError, getAuthLog, getRedirectPatchStatus, isIOSStandalone, openInSafariForSignIn, INVITE_CODE_LENGTH } from '@/lib/firebase'
 import { exportBackup, readBackup } from '@/lib/backup'
 
 /** Account & sharing sheet — Google sign-in, household invite codes, local import. */
@@ -232,12 +232,12 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                       value={joinCode}
                       onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                       placeholder="Enter code"
-                      maxLength={6}
+                      maxLength={INVITE_CODE_LENGTH}
                       className="flex-1 rounded-full bg-[#eef6f7] px-4 py-2 text-sm font-mono-num tracking-[0.15em] uppercase outline-none focus:ring-2 ring-[#0f5257] placeholder:normal-case placeholder:tracking-normal placeholder:text-[#7a9aa0]"
                     />
                     <button
                       onClick={() => run('join', () => joinInvite(joinCode))}
-                      disabled={busy !== null || joinCode.trim().length < 6}
+                      disabled={busy !== null || joinCode.trim().length < INVITE_CODE_LENGTH}
                       className="rounded-full bg-[#0e1a1c] text-[#ddedf0] text-xs font-semibold px-4 py-2 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
                     >
                       {busy === 'join' ? 'Joining…' : 'Join'}

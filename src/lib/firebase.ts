@@ -105,13 +105,15 @@ const profileFor = (uid: string) => doc(db!, 'users', uid, 'profile', 'account')
 const memberFor = (householdId: string, uid: string) => doc(db!, 'households', householdId, 'members', uid)
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+/** Single source of truth for invite code length — the join-code input reads this too. */
+export const INVITE_CODE_LENGTH = 8
 
 /**
  * Invite codes are credentials, so they come from the CSPRNG rather than
  * Math.random. The alphabet drops characters that are easy to misread aloud
  * (0/O, 1/I/L) because these get read out over the phone.
  */
-function makeInviteCode(len = 8): string {
+function makeInviteCode(len: number = INVITE_CODE_LENGTH): string {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
   const bytes = new Uint8Array(len)
   crypto.getRandomValues(bytes)
