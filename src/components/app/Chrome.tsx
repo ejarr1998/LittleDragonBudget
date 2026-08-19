@@ -1,6 +1,7 @@
 import { LayoutDashboard, Wallet, ArrowLeftRight, Sparkles, Target, ChevronLeft, ChevronRight, Plus, Cloud, CloudOff, Loader2 } from 'lucide-react'
 import { monthLabel, shiftMonth, monthKey } from '@/lib/money'
 import { useBudget } from '@/lib/store'
+import { DragonFlame } from '@/components/app/DragonFlame'
 
 export type View = 'dashboard' | 'budget' | 'transactions' | 'insights' | 'goals'
 
@@ -16,7 +17,7 @@ export function Sidebar({ view, setView, onAdd }: { view: View; setView: (v: Vie
   return (
     <aside className="hidden md:flex w-[240px] shrink-0 flex-col bg-[#0e1a1c] text-[#ddedf0] rounded-[20px] p-5 sticky top-6 h-[calc(100vh-3rem)]">
       <div className="flex items-center gap-2.5 px-1">
-        <img src="./dragon.png" alt="Little Dragon" className="w-9 h-9 object-contain" />
+        <DragonFlame size={36} />
         <span className="font-display text-xl tracking-tight">Little Dragon</span>
       </div>
 

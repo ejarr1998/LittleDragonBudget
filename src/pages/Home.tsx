@@ -8,6 +8,7 @@ import { monthKey } from '@/lib/money'
 import { MobileNav, MonthSwitcher, Sidebar, type View } from '@/components/app/Chrome'
 import { AddTransaction } from '@/components/app/AddTransaction'
 import { AccountSheet } from '@/components/app/AccountSheet'
+import { DragonFlame } from '@/components/app/DragonFlame'
 import { Dashboard } from '@/sections/Dashboard'
 import { Budget } from '@/sections/Budget'
 import { Transactions } from '@/sections/Transactions'
@@ -53,7 +54,7 @@ function Shell() {
         <main className="flex-1 min-w-0">
           <header className="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div className="flex items-center gap-3">
-              <img src="./dragon.png" alt="Little Dragon" className="md:hidden w-10 h-10 object-contain" />
+              <DragonFlame size={40} className="md:hidden" />
               <h1 className="font-display text-3xl tracking-tight">{TITLES[view]}</h1>
             </div>
             <div className="flex items-center gap-2">

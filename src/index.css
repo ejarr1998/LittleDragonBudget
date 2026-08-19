@@ -75,3 +75,18 @@
 /* Thin scrollbars for panels */
 .cl-scroll::-webkit-scrollbar { width: 6px; }
 .cl-scroll::-webkit-scrollbar-thumb { background: rgba(14, 26, 28, 0.18); border-radius: 3px; }
+
+/* Dragon flame flicker */
+.dragon-flame { animation: dragon-sway 1.6s ease-in-out infinite; }
+.dragon-flame-outer { animation: dragon-flick 0.9s ease-in-out infinite; transform-origin: 50% 100%; }
+.dragon-flame-inner { animation: dragon-flick 0.7s ease-in-out infinite reverse; }
+.dragon-flame-core { animation: dragon-flick 0.55s ease-in-out infinite; }
+@keyframes dragon-flick {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  35% { transform: scaleY(1.12) scaleX(0.94); }
+  70% { transform: scaleY(0.92) scaleX(1.06); }
+}
+@keyframes dragon-sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(5deg); }
+}
