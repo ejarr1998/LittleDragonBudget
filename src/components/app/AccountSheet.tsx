@@ -16,6 +16,9 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [authDebug, setAuthDebug] = useState<string | null>(() => getLastAuthError())
 
   const [authLog, setAuthLog] = useState<string[]>([])
+  const isInstalledApp =
+    (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
 
   // Refresh diagnostics every time the sheet opens
   useEffect(() => {
@@ -92,6 +95,19 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                 >
                   <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
                 </button>
+                {isInstalledApp && (
+                  <div className="mt-3 rounded-[12px] bg-[#eef6f7] p-3">
+                    <p className="text-[11px] text-[#3d4d50] leading-relaxed">
+                      You're in the installed app. If sign-in keeps bouncing you back here, your browser may be swallowing the result. Try opening the site in your normal browser, sign in there, then join this device with an invite code.
+                    </p>
+                    <button
+                      onClick={() => { navigator.clipboard?.writeText('https://ejarr1998.github.io/LittleDragonBudget/'); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+                      className="mt-2 flex items-center gap-1.5 rounded-full border border-[#c4dbe0] px-3.5 py-1.5 text-xs font-medium text-[#3d4d50] hover:border-[#0f5257] transition-colors"
+                    >
+                      {copied ? <Check size={12} className="text-[#1f7a4d]" /> : <Copy size={12} />} {copied ? 'Link copied' : 'Copy site link'}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -116,8 +132,8 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
             </p>
           </div>
 
-          {/* Household sharing — Google accounts only */}
-          {account?.isGoogle && (
+          {/* Household sharing — anyone can join with a code; creating needs Google */}
+          {account && (
             <div className="rounded-[16px] bg-white p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <span className="p-2 rounded-full bg-[#7a5aa8]/10 text-[#7a5aa8]"><Users size={15} /></span>
@@ -153,6 +169,10 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                         {copied ? <Check size={15} className="text-[#1f7a4d]" /> : <Copy size={15} />}
                       </button>
                     </div>
+                  ) : !account.isGoogle ? (
+                    <p className="text-[11px] text-[#7a9aa0] leading-relaxed">
+                      To create a household, sign in with Google above. To join one your partner already created, enter their code below.
+                    </p>
                   ) : (
                     <button
                       onClick={() => run('create', async () => setCode(await createInvite()))}

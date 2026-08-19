@@ -90,14 +90,32 @@ async function getHouseholdId(uid: string): Promise<string | null> {
 /** Ensure a signed-in session exists (anonymous if brand new) and load the remote state. */
 export async function loadRemote(): Promise<{ uid: string; householdId: string | null; state: BudgetState | null }> {
   if (!auth || !db) throw new Error('firebase-unavailable')
+  const standalone =
+    (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  const hasAuthParams = /[?&](state|code|authType)=/.test(location.search)
+  logAuth(`page load · ${standalone ? 'installed app' : 'browser'} · ${hasAuthParams ? 'URL has sign-in params' : 'clean URL'}`)
   // Complete a Google redirect sign-in if we just came back from one
   try {
     const res = await getRedirectResult(auth)
     if (res?.user) {
       clearAuthError()
+      try { localStorage.removeItem('ldb-signin-attempt') } catch { /* ignore */ }
       logAuth(`redirect OK → ${res.user.email ?? res.user.uid}`)
     } else {
       logAuth('no redirect result pending')
+      // Did a sign-in attempt vanish into another window (installed app vs browser)?
+      try {
+        const attempted = Number(localStorage.getItem('ldb-signin-attempt') ?? 0)
+        if (attempted && Date.now() - attempted < 15 * 60 * 1000) {
+          if (hasAuthParams) {
+            noteError('redirect-result', new Error('auth/missing-redirect-event — the sign-in response arrived but the app lost track of the attempt (browser/app storage split)'))
+            logAuth('FAILED: sign-in came back but the app lost the attempt (installed-app vs browser split)')
+          } else {
+            logAuth('sign-in attempt never returned to this window — did it finish in a different app/browser?')
+          }
+        }
+      } catch { /* ignore */ }
     }
   } catch (e) {
     noteError('redirect-result', e) // surfaced in the account sheet
@@ -153,6 +171,8 @@ export async function signInWithGoogle(): Promise<User> {
     (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true
   if (preferRedirect) {
+    try { localStorage.setItem('ldb-signin-attempt', String(Date.now())) } catch { /* ignore */ }
+    logAuth('starting Google redirect…')
     await signInWithRedirect(auth, provider)
     throw new Error('redirecting') // page navigates away; unreachable
   }
