@@ -1,5 +1,9 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, signInAnonymously, type Auth } from 'firebase/auth'
+import {
+  getAuth, onAuthStateChanged, signInAnonymously, signOut,
+  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  type Auth, type User,
+} from 'firebase/auth'
 import { doc, getDoc, getFirestore, setDoc, type Firestore } from 'firebase/firestore'
 import type { BudgetState } from '@/types'
 
@@ -14,6 +18,13 @@ const firebaseConfig = {
 
 export type SyncStatus = 'connecting' | 'synced' | 'offline' | 'local-only'
 
+export interface AccountInfo {
+  uid: string
+  email: string | null
+  isGoogle: boolean
+  householdId: string | null
+}
+
 let auth: Auth | null = null
 let db: Firestore | null = null
 
@@ -25,27 +36,128 @@ try {
   // Firebase unavailable (blocked network, bad config) — app falls back to local-only
 }
 
-const docFor = (uid: string) => doc(db!, 'users', uid, 'budget', 'state')
+/** Where the budget state lives: the household doc if shared, else the user's own. */
+const docFor = (uid: string, householdId?: string | null) =>
+  householdId
+    ? doc(db!, 'households', householdId, 'budget', 'state')
+    : doc(db!, 'users', uid, 'budget', 'state')
 
-/** Sign in anonymously and load the remote budget state. Returns null if none saved yet. */
-export async function loadRemote(): Promise<{ uid: string; state: BudgetState | null }> {
+const profileFor = (uid: string) => doc(db!, 'users', uid, 'profile', 'account')
+
+/** Read the signed-in user's profile (household membership). */
+async function getHouseholdId(uid: string): Promise<string | null> {
+  if (!db) return null
+  try {
+    const snap = await getDoc(profileFor(uid))
+    return snap.exists() ? ((snap.data() as { householdId?: string }).householdId ?? null) : null
+  } catch {
+    return null
+  }
+}
+
+/** Ensure a signed-in session exists (anonymous if brand new) and load the remote state. */
+export async function loadRemote(): Promise<{ uid: string; householdId: string | null; state: BudgetState | null }> {
   if (!auth || !db) throw new Error('firebase-unavailable')
-  const cred = await signInAnonymously(auth)
-  const snap = await getDoc(docFor(cred.user.uid))
-  return { uid: cred.user.uid, state: snap.exists() ? (snap.data() as BudgetState) : null }
+  // Complete a Google redirect sign-in if we just came back from one
+  try { await getRedirectResult(auth) } catch { /* no redirect pending */ }
+  if (!auth.currentUser) await signInAnonymously(auth)
+  const uid = auth.currentUser!.uid
+  const householdId = await getHouseholdId(uid)
+  const snap = await getDoc(docFor(uid, householdId))
+  return { uid, householdId, state: snap.exists() ? (snap.data() as BudgetState) : null }
+}
+
+/** Observe auth changes (Google sign-in/out). */
+export function onAuthChange(cb: (user: User | null) => void) {
+  if (!auth) return () => {}
+  return onAuthStateChanged(auth, cb)
+}
+
+export function currentAccount(): AccountInfo | null {
+  if (!auth?.currentUser) return null
+  const u = auth.currentUser
+  return {
+    uid: u.uid,
+    email: u.email,
+    isGoogle: u.providerData.some((p) => p.providerId === 'google.com'),
+    householdId: null,
+  }
+}
+
+/** Google sign-in — popup on desktop, redirect fallback for mobile/popup-blockers. */
+export async function signInWithGoogle(): Promise<User> {
+  if (!auth) throw new Error('firebase-unavailable')
+  const provider = new GoogleAuthProvider()
+  try {
+    const cred = await signInWithPopup(auth, provider)
+    return cred.user
+  } catch (e) {
+    const code = (e as { code?: string }).code ?? ''
+    if (code.includes('popup') || code.includes('cancelled')) {
+      await signInWithRedirect(auth, provider)
+      // page navigates away; unreachable
+      throw new Error('redirecting')
+    }
+    throw e
+  }
+}
+
+export async function signOutAccount() {
+  if (!auth) return
+  await signOut(auth)
+  await signInAnonymously(auth)
+}
+
+/** Create a household around the signed-in user's budget; returns an invite code. */
+export async function createHousehold(): Promise<string> {
+  if (!auth?.currentUser || !db) throw new Error('firebase-unavailable')
+  const uid = auth.currentUser.uid
+  const householdId = uid // owner uid doubles as household id — one household per owner
+  const code = Math.random().toString(36).slice(2, 8).toUpperCase()
+  await setDoc(profileFor(uid), { householdId, email: auth.currentUser.email ?? null }, { merge: true })
+  await setDoc(doc(db, 'invites', code), { householdId, createdBy: uid, createdAt: Date.now() })
+  return code
+}
+
+/** Join a household via invite code. Both members then share the same budget doc. */
+export async function joinHousehold(code: string): Promise<void> {
+  if (!auth?.currentUser || !db) throw new Error('firebase-unavailable')
+  const snap = await getDoc(doc(db, 'invites', code.trim().toUpperCase()))
+  if (!snap.exists()) throw new Error('bad-code')
+  const { householdId } = snap.data() as { householdId: string }
+  await setDoc(profileFor(auth.currentUser.uid), { householdId, email: auth.currentUser.email ?? null }, { merge: true })
+}
+
+/** Leave the household — back to a personal budget. */
+export async function leaveHousehold(): Promise<void> {
+  if (!auth?.currentUser || !db) throw new Error('firebase-unavailable')
+  await setDoc(profileFor(auth.currentUser.uid), { householdId: null, email: auth.currentUser.email ?? null }, { merge: true })
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Debounced save of the whole budget state to Firestore. */
-export function saveRemote(uid: string, state: BudgetState, onError: () => void) {
+export function saveRemote(uid: string, householdId: string | null, state: BudgetState, onError: () => void) {
   if (!db) return
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(async () => {
     try {
-      await setDoc(docFor(uid), state)
+      await setDoc(docFor(uid, householdId), state)
     } catch {
       onError()
     }
   }, 600)
+}
+
+/** One-shot write — used to import this device's budget into an account/household. */
+export async function pushStateNow(uid: string, householdId: string | null, state: BudgetState): Promise<void> {
+  if (!db) throw new Error('firebase-unavailable')
+  await setDoc(docFor(uid, householdId), state)
+}
+
+/** One-shot read — used to check whether an account/household already has data. */
+export async function pullStateOnce(uid: string, householdId: string | null): Promise<BudgetState | null> {
+  if (!db) return null
+  const snap = await getDoc(docFor(uid, householdId))
+  return snap.exists() ? (snap.data() as BudgetState) : null
 }

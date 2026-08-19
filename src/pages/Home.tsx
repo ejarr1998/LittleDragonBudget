@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, MoreVertical, Eraser, Maximize, Minimize } from 'lucide-react'
+import { Plus, MoreVertical, Eraser, Maximize, Minimize, CircleUserRound } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -7,6 +7,7 @@ import { BudgetProvider, useBudget } from '@/lib/store'
 import { monthKey } from '@/lib/money'
 import { MobileNav, MonthSwitcher, Sidebar, type View } from '@/components/app/Chrome'
 import { AddTransaction } from '@/components/app/AddTransaction'
+import { AccountSheet } from '@/components/app/AccountSheet'
 import { Dashboard } from '@/sections/Dashboard'
 import { Budget } from '@/sections/Budget'
 import { Transactions } from '@/sections/Transactions'
@@ -29,6 +30,7 @@ function Shell() {
   const setView = (v: View) => { setViewRaw(v); history.replaceState(null, '', `#${v}`) }
   const [month, setMonth] = useState(monthKey(new Date()))
   const [addOpen, setAddOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { startFresh } = useBudget()
 
@@ -81,6 +83,9 @@ function Shell() {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-2xl">
+                  <DropdownMenuItem onClick={() => setAccountOpen(true)} className="gap-2">
+                    <CircleUserRound size={15} /> Account & sharing
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => { if (confirm('Start fresh? This permanently deletes ALL transactions and goals (your category budgets stay). This cannot be undone.')) startFresh() }}
                     className="gap-2 text-[#c0564b] focus:text-[#c0564b]"
@@ -102,6 +107,7 @@ function Shell() {
 
       <MobileNav view={view} setView={setView} />
       <AddTransaction open={addOpen} onClose={() => setAddOpen(false)} />
+      <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} />
     </div>
   )
 }

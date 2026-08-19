@@ -1,7 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BudgetState, Category, Goal, IncomeSource, Transaction } from '@/types'
 import { categorize, monthKey, uid } from '@/lib/money'
-import { loadRemote, saveRemote, type SyncStatus } from '@/lib/firebase'
+import {
+  loadRemote, saveRemote, pushStateNow, onAuthChange, signInWithGoogle,
+  signOutAccount, createHousehold, joinHousehold, leaveHousehold,
+  currentAccount, type AccountInfo, type SyncStatus,
+} from '@/lib/firebase'
 
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'rent', name: 'Rent', bucket: 'fixed', limit: 1650, color: '#0f5257', icon: 'home' },
@@ -106,6 +110,13 @@ const KEY = 'clover-budget-v1'
 
 interface Store extends BudgetState {
   syncStatus: SyncStatus
+  account: AccountInfo | null
+  signInGoogle: () => Promise<void>
+  signOut: () => Promise<void>
+  createInvite: () => Promise<string>
+  joinInvite: (code: string) => Promise<void>
+  leaveHousehold: () => Promise<void>
+  importLocal: () => Promise<void>
   addTransaction: (t: Omit<Transaction, 'id' | 'categoryId'> & { categoryId?: string }) => void
   deleteTransaction: (id: string) => void
   recategorize: (id: string, categoryId: string) => void
@@ -138,29 +149,46 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   })
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting')
+  const [account, setAccount] = useState<AccountInfo | null>(null)
   const uidRef = useRef<string | null>(null)
+  const householdRef = useRef<string | null>(null)
   const hydratedRef = useRef(false)
+  const stateRef = useRef(state)
+  stateRef.current = state
 
-  // On mount: sign in anonymously and hydrate from Firestore (fall back to local).
+  // Hydrate from Firestore; returns true if a remote state was loaded.
+  const hydrate = async (): Promise<boolean> => {
+    const { uid: remoteUid, householdId, state: remote } = await loadRemote()
+    uidRef.current = remoteUid
+    householdRef.current = householdId
+    if (remote?.categories?.length) {
+      setState({ ...remote, categories: mergeCategories(remote.categories), incomes: remote.incomes ?? [], goals: remote.goals ?? [] }) // fill fields missing from older saves
+      hydratedRef.current = true
+      setSyncStatus('synced')
+      return true
+    }
+    // Nothing saved remotely yet: push this device's budget up.
+    hydratedRef.current = true
+    saveRemote(remoteUid, householdId, JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? stateRef.current, () => setSyncStatus('offline'))
+    setSyncStatus('synced')
+    return false
+  }
+
+  // On mount: sign in (anonymously if brand new) and hydrate (fall back to local).
   useEffect(() => {
     let cancelled = false
-    loadRemote()
-      .then(({ uid: remoteUid, state: remote }) => {
-        if (cancelled) return
-        uidRef.current = remoteUid
-        if (remote?.transactions?.length && remote?.categories?.length) {
-          setState({ ...remote, categories: mergeCategories(remote.categories), incomes: remote.incomes ?? [], goals: remote.goals ?? [] }) // fill fields missing from older saves
-        } else if (remote === null) {
-          // First sign-in on a fresh account: push the local seed up.
-          saveRemote(remoteUid, JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? state, () => setSyncStatus('offline'))
-        }
-        hydratedRef.current = true
-        setSyncStatus('synced')
-      })
-      .catch(() => {
-        if (!cancelled) { hydratedRef.current = true; setSyncStatus('local-only') }
-      })
-    return () => { cancelled = true }
+    hydrate()
+      .then(() => { if (!cancelled) setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) })
+      .catch(() => { if (!cancelled) { hydratedRef.current = true; setSyncStatus('local-only') } })
+    const unsub = onAuthChange((user) => {
+      if (!cancelled && user && user.uid !== uidRef.current) {
+        // Account changed (Google sign-in/out) — re-hydrate from the new account.
+        hydrate()
+          .then(() => { if (!cancelled) setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) })
+          .catch(() => { if (!cancelled) setSyncStatus('offline') })
+      }
+    })
+    return () => { cancelled = true; unsub() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -168,13 +196,47 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(KEY, JSON.stringify(state)) } catch { /* storage full */ }
     if (hydratedRef.current && uidRef.current) {
       setSyncStatus((s) => (s === 'synced' ? 'synced' : s))
-      saveRemote(uidRef.current, state, () => setSyncStatus('offline'))
+      saveRemote(uidRef.current, householdRef.current, state, () => setSyncStatus('offline'))
     }
   }, [state])
 
   const store = useMemo<Store>(() => ({
     ...state,
     syncStatus,
+    account,
+    signInGoogle: async () => {
+      await signInWithGoogle()
+      await hydrate()
+      setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
+    },
+    signOut: async () => {
+      await signOutAccount()
+      await hydrate()
+      setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
+    },
+    createInvite: async () => {
+      const code = await createHousehold()
+      const uid = uidRef.current!
+      householdRef.current = uid
+      // Move the current budget into the household doc so the partner sees it.
+      await pushStateNow(uid, uid, stateRef.current)
+      setAccount(currentAccount() ? { ...currentAccount()!, householdId: uid } : null)
+      return code
+    },
+    joinInvite: async (code) => {
+      await joinHousehold(code)
+      await hydrate() // pulls the shared budget down (or pushes local up if empty)
+      setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
+    },
+    leaveHousehold: async () => {
+      await leaveHousehold()
+      await hydrate()
+      setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
+    },
+    importLocal: async () => {
+      if (!uidRef.current) throw new Error('not-signed-in')
+      await pushStateNow(uidRef.current, householdRef.current, stateRef.current)
+    },
     addTransaction: (t) => setState((s) => ({
       ...s,
       transactions: [{ ...t, id: uid(), categoryId: t.categoryId ?? categorize(t.merchant, s.categories) }, ...s.transactions]
@@ -227,7 +289,8 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       goals: [],
       // keep categories + limits — that's your budget setup, not test data
     })),
-  }), [state, syncStatus])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [state, syncStatus, account])
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }
