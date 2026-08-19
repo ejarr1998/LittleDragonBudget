@@ -5,6 +5,7 @@ import { categorize, fmt, monthKey, parseCSV, todayKey } from '@/lib/money'
 import { parseStatementPDF } from '@/lib/pdf'
 import { CategoryIcon } from '@/components/app/ui'
 import { CategoryPicker } from '@/components/app/CategoryPicker'
+import { MerchantAutocomplete } from '@/components/app/MerchantAutocomplete'
 
 type Filter = 'all' | 'expense' | 'income'
 
@@ -113,12 +114,12 @@ export function Transactions({ month }: { month: string }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <input autoComplete="off"
+          <MerchantAutocomplete
             value={qMerchant}
-            onChange={(e) => { setQMerchant(e.target.value); setQCat(null) }}
-            onKeyDown={(e) => { if (e.key === 'Enter') qAmountRef.current?.focus() }}
-            placeholder="Merchant — e.g. Trader Joe's"
-            className="flex-1 min-w-[150px] rounded-full bg-[#eef6f7] px-4 py-2.5 text-sm outline-none focus:ring-2 ring-[#0f5257] placeholder:text-[#7a9aa0]"
+            onChange={(v) => { setQMerchant(v); setQCat(null) }}
+            onPick={(merchant, cat) => { setQMerchant(merchant); if (cat) setQCat(cat); qAmountRef.current?.focus() }}
+            onEnter={() => qAmountRef.current?.focus()}
+            className="flex-1 min-w-[150px]"
           />
           <div className="relative w-32">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[#7a9aa0]">$</span>

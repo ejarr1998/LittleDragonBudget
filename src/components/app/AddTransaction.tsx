@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { useBudget } from '@/lib/store'
 import { todayKey } from '@/lib/money'
+import { MerchantAutocomplete } from '@/components/app/MerchantAutocomplete'
 
 /** Full-height slide-left drawer for adding a transaction. */
 export function AddTransaction({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -86,13 +87,17 @@ export function AddTransaction({ open, onClose }: { open: boolean; onClose: () =
             <span className="text-[11px] uppercase tracking-[0.14em] text-[#3d4d50]">
               {kind === 'expense' ? 'Merchant' : 'Source'}
             </span>
-            <input autoComplete="off"
-              value={merchant} onChange={(e) => setMerchant(e.target.value)}
-              placeholder={kind === 'expense' ? 'e.g. Trader Joe’s' : 'e.g. Acme Corp — Salary'}
-              className="mt-2 w-full rounded-[14px] bg-[#ddedf0]/60 px-4 py-3 text-sm outline-none focus:ring-2 ring-[#0f5257] placeholder:text-[#7a9aa0]"
-            />
+            <div className="mt-2">
+              <MerchantAutocomplete
+                value={merchant}
+                onChange={(v) => { setMerchant(v); setCategoryId('') }}
+                onPick={(m, cat) => { setMerchant(m); if (cat && kind === 'expense') setCategoryId(cat) }}
+                placeholder={kind === 'expense' ? 'e.g. Trader Joe’s' : 'e.g. Acme Corp — Salary'}
+                inputClassName="rounded-[14px] bg-[#ddedf0]/60 px-4 py-3 text-sm"
+              />
+            </div>
             {kind === 'expense' && !categoryId && (
-              <p className="mt-1.5 text-[11px] text-[#3d4d50]">Leave category blank and Clover will auto-assign it from the name.</p>
+              <p className="mt-1.5 text-[11px] text-[#3d4d50]">Leave category blank and the dragon will auto-assign it from the name.</p>
             )}
           </label>
 
