@@ -235,11 +235,40 @@ export function currentAccount(householdId: string | null = null): AccountInfo |
  * combined with the UA check it identifies this one specific environment.
  * iPadOS 13+ reports a desktop Safari UA, hence the touch-points fallback.
  */
-function isIOSStandalone(): boolean {
+export function isIOSStandalone(): boolean {
   const iOSDevice = /iPhone|iPad|iPod/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true
   return iOSDevice && standalone
+}
+
+/**
+ * Escape a standalone iOS home-screen app into Safari, on the same URL.
+ *
+ * Redirect-based sign-in does not work here: navigating to an external origin
+ * from a standalone iOS web app hands off to Safari as a separate app/process,
+ * not a window inside the installed app. Google's own redirect back afterward
+ * lands in that Safari instance, which is not the same context the home-screen
+ * icon reopens — so the icon never sees a result, regardless of how many times
+ * it's retried. This was confirmed against a live device: two redirect
+ * attempts, both came back with a clean URL and no pending result.
+ *
+ * A programmatic click on an <a target="_blank"> is the standard, reliable way
+ * to force that Safari hand-off on iOS (plain location.href / window.open do
+ * not reliably trigger it from standalone mode). Sign-in then happens
+ * entirely inside ordinary Safari, which already works — Auth storage for the
+ * origin is shared between Safari and the installed icon, so reopening the
+ * icon afterward should show the signed-in state without any special
+ * redirect-completion handling.
+ */
+export function openInSafariForSignIn(): void {
+  const a = document.createElement('a')
+  a.href = `${location.origin}${location.pathname}` // drop any stale query params
+  a.target = '_blank'
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }
 
 async function startRedirectSignIn(provider: GoogleAuthProvider, reason: string): Promise<never> {
@@ -255,17 +284,13 @@ export async function signInWithGoogle(): Promise<User> {
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: 'select_account' })
 
-  // A home-screen iOS web app is a single WKWebView with no browser chrome —
-  // there is nowhere for window.open() to put a second window. It typically
-  // returns a reference to nothing usable, and Firebase's popup flow then
-  // polls that reference for a 'closed' state that will never arrive: the
-  // sign-in promise never resolves and never rejects. That's a silent hang,
-  // not an error — nothing to catch, which is why it looked like the button
-  // simply did nothing. Redirect is the only flow that works here, because
-  // standalone iOS *can* navigate its one webview to another page and back;
-  // it just cannot open a second one.
+  // Neither popup nor redirect completes from inside a standalone iOS app —
+  // see openInSafariForSignIn() for why. The UI routes iOS standalone to that
+  // function directly instead of calling signInWithGoogle, so this should be
+  // unreachable there; it's a safety net in case some other entry point ever
+  // calls this without checking first.
   if (isIOSStandalone()) {
-    return startRedirectSignIn(provider, 'iOS home-screen app — popup cannot open a second window here')
+    throw new Error('ios-standalone-use-safari-handoff')
   }
 
   // Firebase's default persistence writes the signed-in user to IndexedDB, and

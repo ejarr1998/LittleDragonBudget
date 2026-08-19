@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud, Download, FileUp } from 'lucide-react'
 import { useBudget } from '@/lib/store'
-import { getLastAuthError, getAuthLog, getRedirectPatchStatus } from '@/lib/firebase'
+import { getLastAuthError, getAuthLog, getRedirectPatchStatus, isIOSStandalone, openInSafariForSignIn } from '@/lib/firebase'
 import { exportBackup, readBackup } from '@/lib/backup'
 
 /** Account & sharing sheet — Google sign-in, household invite codes, local import. */
@@ -24,6 +24,9 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
   const isInstalledApp =
     (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true
+  // iOS treats a home-screen icon and Safari as separate apps, so sign-in
+  // cannot complete without leaving the icon; see openInSafariForSignIn.
+  const needsSafariHandoff = isIOSStandalone()
 
   const [handoffBlocked, setHandoffBlocked] = useState(false)
 
@@ -105,13 +108,20 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                   Right now this budget is tied to an anonymous session on this device. Sign in to attach it to your Google account — then you can share it.
                 </p>
                 <button
-                  onClick={() => run('in', signInGoogle)}
+                  onClick={() => needsSafariHandoff ? openInSafariForSignIn() : run('in', signInGoogle)}
                   disabled={busy !== null}
                   className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
                 >
-                  <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
+                  <LogIn size={14} /> {needsSafariHandoff ? 'Open Safari to sign in' : busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
                 </button>
-                {handoffBlocked && (
+                {needsSafariHandoff && (
+                  <div className="mt-3 rounded-[12px] bg-[#eef6f7] p-3">
+                    <p className="text-[11px] text-[#3d4d50] leading-relaxed">
+                      iOS keeps this installed icon separate from Safari, so Google sign-in can't finish without leaving it. Tap the button above — it opens this same page in Safari. Sign in there, then come back and reopen this icon; it'll already show you signed in.
+                    </p>
+                  </div>
+                )}
+                {handoffBlocked && !needsSafariHandoff && (
                   <div className="mt-3 rounded-[12px] bg-[#fdf3e7] border border-[#ecd9b8] p-3">
                     <p className="text-[11px] font-semibold text-[#8a6d1a]">Sign-in didn't come back</p>
                     <p className="text-[11px] text-[#6b5716] mt-1 leading-relaxed">
@@ -127,7 +137,7 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                     </p>
                   </div>
                 )}
-                {isInstalledApp && !handoffBlocked && (
+                {isInstalledApp && !handoffBlocked && !needsSafariHandoff && (
                   <div className="mt-3 rounded-[12px] bg-[#eef6f7] p-3">
                     <p className="text-[11px] text-[#3d4d50] leading-relaxed">
                       You're in the installed app. If sign-in keeps bouncing you back here, your browser may be swallowing the result. Try opening the site in your normal browser, sign in there, then join this device with an invite code.
