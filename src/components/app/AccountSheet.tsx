@@ -103,49 +103,39 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
               </div>
             ) : (
               <>
-                <div className="text-sm font-medium">Sign in with Google</div>
-                <p className="text-[11px] text-[#3d4d50] mt-1 leading-relaxed">
-                  Right now this budget is tied to an anonymous session on this device. Sign in to attach it to your Google account — then you can share it.
-                </p>
                 {needsSafariHandoff ? (
-                  // SIGN-IN NOTE: this must be a real <a target="_blank"> the person
-                  // taps directly — a JS-triggered .click() on a detached anchor was
-                  // tried first and confirmed (on-device) to just navigate in place
-                  // inside the same standalone webview instead of escaping to Safari.
-                  // iOS only honors the escape for a genuine, trusted tap on the
-                  // anchor element itself.
-                  <a
-                    href={SITE_URL}
-                    target="_blank"
-                    rel="noopener"
-                    className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors w-fit"
-                  >
-                    <LogIn size={14} /> Open Safari to sign in
-                  </a>
-                ) : (
-                  <button
-                    onClick={() => run('in', signInGoogle)}
-                    disabled={busy !== null}
-                    className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
-                  >
-                    <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
-                  </button>
-                )}
-                {needsSafariHandoff && (
-                  <div className="mt-3 rounded-[12px] bg-[#eef6f7] p-3">
-                    <p className="text-[11px] text-[#3d4d50] leading-relaxed">
-                      iOS keeps this installed icon separate from Safari, so Google sign-in can't finish without leaving it. Tap the link above — it opens this same page in Safari. Sign in there, then come back and reopen this icon; it'll already show you signed in.
+                  <>
+                    <div className="text-sm font-medium">Join with a code instead</div>
+                    <p className="text-[11px] text-[#3d4d50] mt-1 leading-relaxed">
+                      iOS keeps this installed icon separate from Safari, so Google sign-in can't finish here directly — attempts to hand off to Safari automatically haven't been reliable. This path sidesteps that entirely and doesn't need this icon to sign in at all:
                     </p>
-                    <p className="text-[11px] text-[#7a9aa0] mt-1.5 leading-relaxed">
-                      If tapping it doesn't visibly leave this app, copy the link below and paste it into Safari directly instead.
-                    </p>
+                    <ol className="text-[11px] text-[#3d4d50] mt-2 ml-4 list-decimal space-y-1.5 leading-relaxed">
+                      <li>Open the <b>Safari app</b> yourself (not from this icon) and go to the link below.</li>
+                      <li>Sign in with Google there — this part already works.</li>
+                      <li>In Safari, scroll to "Share with your partner" and tap <b>Create invite code</b>.</li>
+                      <li>Come back to this icon and enter that code under <b>Join with a code</b> below — this icon can stay signed out.</li>
+                    </ol>
                     <button
                       onClick={() => { navigator.clipboard?.writeText(SITE_URL); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-                      className="mt-2 flex items-center gap-1.5 rounded-full border border-[#c4dbe0] px-3.5 py-1.5 text-xs font-medium text-[#3d4d50] hover:border-[#0f5257] transition-colors"
+                      className="mt-3 flex items-center gap-1.5 rounded-full border border-[#c4dbe0] px-3.5 py-1.5 text-xs font-medium text-[#3d4d50] hover:border-[#0f5257] transition-colors"
                     >
-                      {copied ? <Check size={12} className="text-[#1f7a4d]" /> : <Copy size={12} />} {copied ? 'Link copied' : 'Copy site link'}
+                      {copied ? <Check size={12} className="text-[#1f7a4d]" /> : <Copy size={12} />} {copied ? 'Link copied — paste it in Safari' : 'Copy site link'}
                     </button>
-                  </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm font-medium">Sign in with Google</div>
+                    <p className="text-[11px] text-[#3d4d50] mt-1 leading-relaxed">
+                      Right now this budget is tied to an anonymous session on this device. Sign in to attach it to your Google account — then you can share it.
+                    </p>
+                    <button
+                      onClick={() => run('in', signInGoogle)}
+                      disabled={busy !== null}
+                      className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
+                    >
+                      <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
+                    </button>
+                  </>
                 )}
                 {handoffBlocked && !needsSafariHandoff && (
                   <div className="mt-3 rounded-[12px] bg-[#fdf3e7] border border-[#ecd9b8] p-3">
