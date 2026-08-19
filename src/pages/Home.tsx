@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Plus, MoreVertical, Eraser, Maximize, Minimize, CircleUserRound } from 'lucide-react'
+import { Plus, MoreVertical, Maximize, Minimize, CircleUserRound } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { BudgetProvider, useBudget } from '@/lib/store'
+import { BudgetProvider } from '@/lib/store'
 import { monthKey } from '@/lib/money'
 import { MobileNav, MonthSwitcher, Sidebar, type View } from '@/components/app/Chrome'
 import { AddTransaction } from '@/components/app/AddTransaction'
@@ -33,8 +33,6 @@ function Shell() {
   const [addOpen, setAddOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const { startFresh } = useBudget()
-
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement)
     document.addEventListener('fullscreenchange', onChange)
@@ -86,12 +84,6 @@ function Shell() {
                 <DropdownMenuContent align="end" className="rounded-2xl">
                   <DropdownMenuItem onClick={() => setAccountOpen(true)} className="gap-2">
                     <CircleUserRound size={15} /> Account & sharing
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => { if (confirm('Start fresh? This permanently deletes ALL transactions and goals (your category budgets stay). This cannot be undone.')) startFresh() }}
-                    className="gap-2 text-[#c0564b] focus:text-[#c0564b]"
-                  >
-                    <Eraser size={15} /> Start fresh — clear all data
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

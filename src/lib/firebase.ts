@@ -84,19 +84,29 @@ export function currentAccount(): AccountInfo | null {
   }
 }
 
-/** Google sign-in — popup on desktop, redirect fallback for mobile/popup-blockers. */
+/** Google sign-in — redirect on mobile/standalone (popups fail there), popup on desktop. */
 export async function signInWithGoogle(): Promise<User> {
   if (!auth) throw new Error('firebase-unavailable')
   const provider = new GoogleAuthProvider()
+  const preferRedirect =
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  if (preferRedirect) {
+    await signInWithRedirect(auth, provider)
+    throw new Error('redirecting') // page navigates away; unreachable
+  }
   try {
     const cred = await signInWithPopup(auth, provider)
     return cred.user
   } catch (e) {
     const code = (e as { code?: string }).code ?? ''
-    if (code.includes('popup') || code.includes('cancelled')) {
+    if (code === 'auth/popup-blocked' || code === 'auth/popup-failed' || code === 'auth/internal-error') {
       await signInWithRedirect(auth, provider)
-      // page navigates away; unreachable
       throw new Error('redirecting')
+    }
+    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      throw new Error('cancelled') // user closed it — not a real failure
     }
     throw e
   }

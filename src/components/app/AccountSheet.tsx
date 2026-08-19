@@ -19,13 +19,17 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
     setBusy(label); setErr(null)
     try { await fn() } catch (e) {
       const c = (e as { code?: string; message?: string })
-      if (c.message === 'redirecting') return
+      if (c.message === 'redirecting' || c.message === 'cancelled') return
       setErr(
         c.code === 'auth/operation-not-allowed'
           ? 'Google sign-in is not enabled yet — turn on the Google provider in the Firebase console (Authentication → Sign-in method).'
-          : c.message === 'bad-code'
-            ? 'That code did not match any household. Check the letters and try again.'
-            : 'Something went wrong — check your connection and try again.'
+          : c.code === 'auth/unauthorized-domain'
+            ? 'This domain is not authorized in Firebase — add it under Authentication → Settings → Authorized domains.'
+            : c.code === 'auth/account-exists-with-different-credential'
+              ? 'That email is already linked to another sign-in method.'
+            : c.message === 'bad-code'
+              ? 'That code did not match any household. Check the letters and try again.'
+              : `Sign-in failed (${c.code ?? c.message ?? 'unknown error'}). Tell me this code and I can pin it down.`
       )
     } finally { setBusy(null) }
   }
