@@ -27,6 +27,24 @@ export interface AccountInfo {
 
 let auth: Auth | null = null
 let db: Firestore | null = null
+let lastAuthError: string | null = null
+
+const noteError = (context: string, e: unknown) => {
+  const c = e as { code?: string; message?: string }
+  lastAuthError = `${context}: ${c.code ?? c.message ?? String(e)}`
+  try { sessionStorage.setItem('ldb-auth-debug', lastAuthError) } catch { /* private mode */ }
+}
+
+/** Last auth/firestore error seen, for diagnosing sign-in issues in the UI. */
+export function getLastAuthError(): string | null {
+  if (lastAuthError) return lastAuthError
+  try { return sessionStorage.getItem('ldb-auth-debug') } catch { return null }
+}
+
+export function clearAuthError() {
+  lastAuthError = null
+  try { sessionStorage.removeItem('ldb-auth-debug') } catch { /* ignore */ }
+}
 
 try {
   const app = initializeApp(firebaseConfig)
@@ -50,7 +68,8 @@ async function getHouseholdId(uid: string): Promise<string | null> {
   try {
     const snap = await getDoc(profileFor(uid))
     return snap.exists() ? ((snap.data() as { householdId?: string }).householdId ?? null) : null
-  } catch {
+  } catch (e) {
+    noteError('read-profile (firestore rules?)', e)
     return null
   }
 }
@@ -59,11 +78,24 @@ async function getHouseholdId(uid: string): Promise<string | null> {
 export async function loadRemote(): Promise<{ uid: string; householdId: string | null; state: BudgetState | null }> {
   if (!auth || !db) throw new Error('firebase-unavailable')
   // Complete a Google redirect sign-in if we just came back from one
-  try { await getRedirectResult(auth) } catch { /* no redirect pending */ }
-  if (!auth.currentUser) await signInAnonymously(auth)
+  try {
+    const res = await getRedirectResult(auth)
+    if (res?.user) clearAuthError()
+  } catch (e) {
+    noteError('redirect-result', e) // surfaced in the account sheet
+  }
+  if (!auth.currentUser) {
+    try { await signInAnonymously(auth) } catch (e) { noteError('anon-sign-in', e); throw e }
+  }
   const uid = auth.currentUser!.uid
   const householdId = await getHouseholdId(uid)
-  const snap = await getDoc(docFor(uid, householdId))
+  let snap
+  try {
+    snap = await getDoc(docFor(uid, householdId))
+  } catch (e) {
+    noteError('load-budget (firestore rules?)', e)
+    throw e
+  }
   return { uid, householdId, state: snap.exists() ? (snap.data() as BudgetState) : null }
 }
 

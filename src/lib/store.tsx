@@ -158,8 +158,17 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state)
   stateRef.current = state
 
+  const inflightRef = useRef<Promise<boolean> | null>(null)
+
   // Hydrate from Firestore; returns true if a remote state was loaded.
-  const hydrate = async (): Promise<boolean> => {
+  const hydrate = (): Promise<boolean> => {
+    if (inflightRef.current) return inflightRef.current // one load at a time
+    const p = hydrateInner().finally(() => { inflightRef.current = null })
+    inflightRef.current = p
+    return p
+  }
+
+  const hydrateInner = async (): Promise<boolean> => {
     const { uid: remoteUid, householdId, state: remote } = await loadRemote()
     uidRef.current = remoteUid
     householdRef.current = householdId
@@ -181,13 +190,13 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     hydrate()
       .then(() => { if (!cancelled) setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) })
-      .catch(() => { if (!cancelled) { hydratedRef.current = true; setSyncStatus('local-only') } })
+      .catch(() => { if (!cancelled) { hydratedRef.current = true; setSyncStatus('local-only'); setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) } })
     const unsub = onAuthChange((user) => {
       if (!cancelled && user && user.uid !== uidRef.current) {
         // Account changed (Google sign-in/out) — re-hydrate from the new account.
         hydrate()
           .then(() => { if (!cancelled) setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) })
-          .catch(() => { if (!cancelled) setSyncStatus('offline') })
+          .catch(() => { if (!cancelled) { setSyncStatus('offline'); setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) } })
       }
     })
     return () => { cancelled = true; unsub() }

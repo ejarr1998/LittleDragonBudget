@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud } from 'lucide-react'
 import { useBudget } from '@/lib/store'
+import { getLastAuthError } from '@/lib/firebase'
 
 /** Account & sharing sheet — Google sign-in, household invite codes, local import. */
 export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -12,6 +13,10 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [copied, setCopied] = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const [imported, setImported] = useState(false)
+  const [authDebug, setAuthDebug] = useState<string | null>(() => getLastAuthError())
+
+  // Refresh diagnostics every time the sheet opens
+  useEffect(() => { if (open) setAuthDebug(getLastAuthError()) }, [open])
 
   if (!open) return null
 
@@ -31,7 +36,7 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
               ? 'That code did not match any household. Check the letters and try again.'
               : `Sign-in failed (${c.code ?? c.message ?? 'unknown error'}). Tell me this code and I can pin it down.`
       )
-    } finally { setBusy(null) }
+    } finally { setBusy(null); setAuthDebug(getLastAuthError()) }
   }
 
   const sheet = (
@@ -86,6 +91,17 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
               </>
             )}
           </div>
+
+          {/* Diagnostics — shows the real reason sign-in didn't stick */}
+          {authDebug && (
+            <div className="rounded-[16px] bg-[#fdf3e7] border border-[#ecd9b8] p-3.5">
+              <div className="text-[11px] font-semibold text-[#8a6d1a]">Sign-in diagnostic</div>
+              <p className="text-[11px] text-[#6b5716] mt-0.5 leading-relaxed break-words font-mono-num">{authDebug}</p>
+              <p className="text-[11px] text-[#6b5716] mt-1 leading-relaxed">
+                Send me this message and I'll know exactly what's blocking you.
+              </p>
+            </div>
+          )}
 
           {/* Household sharing — Google accounts only */}
           {account?.isGoogle && (
