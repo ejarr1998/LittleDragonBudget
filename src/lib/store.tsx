@@ -4,9 +4,9 @@ import { categorize, cleanMerchant, monthKey, uid } from '@/lib/money'
 import { playChaching } from '@/lib/sound'
 import { breatheFire } from '@/lib/fire'
 import {
-  loadRemote, saveRemote, pushStateNow, onAuthChange, signInWithGoogle,
-  signOutAccount, createHousehold, joinHousehold, leaveHousehold, logAuth,
-  currentAccount, type AccountInfo, type SyncStatus,
+  loadRemote, saveRemote, subscribeRemote, flushRemote, pushStateNow, onAuthChange,
+  signInWithGoogle, signOutAccount, createHousehold, joinHousehold, leaveHousehold,
+  logAuth, currentAccount, type AccountInfo, type StoredBudget, type SyncStatus,
 } from '@/lib/firebase'
 
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -98,6 +98,17 @@ function seedState(): BudgetState {
   }
 }
 
+/** Strip the sync envelope and backfill fields missing from older saves. */
+function normalise(remote: StoredBudget): BudgetState {
+  return {
+    transactions: remote.transactions ?? [],
+    categories: mergeCategories(remote.categories),
+    goals: remote.goals ?? [],
+    incomes: remote.incomes ?? [],
+    monthlyIncome: remote.monthlyIncome ?? 0,
+  }
+}
+
 /** Add any newly-introduced default categories to saved budgets. */
 function mergeCategories(saved: Category[] | undefined): Category[] {
   const list = saved?.length ? [...saved] : []
@@ -108,7 +119,35 @@ function mergeCategories(saved: Category[] | undefined): Category[] {
 }
 
 // --- Store -------------------------------------------------------------------
-const KEY = 'clover-budget-v1'
+const KEY = 'ldb-budget-v1'
+const LEGACY_KEYS = ['clover-budget-v1'] // renamed from an earlier scaffold
+
+/** Identifies this tab so it can ignore the echo of its own writes. */
+const WRITER_ID = Math.random().toString(36).slice(2, 10)
+
+/** Union two lists of id-bearing records, preferring `mine` on conflict. */
+function unionById<T extends { id: string }>(mine: T[], theirs: T[]): T[] {
+  const out = [...mine]
+  const have = new Set(mine.map((x) => x.id))
+  for (const t of theirs) if (!have.has(t.id)) out.push(t)
+  return out
+}
+
+const emptyState = (): BudgetState => ({
+  transactions: [], categories: DEFAULT_CATEGORIES, goals: [], incomes: [], monthlyIncome: 0,
+})
+
+const readLocal = (): BudgetState | null => {
+  for (const k of [KEY, ...LEGACY_KEYS]) {
+    try {
+      const raw = localStorage.getItem(k)
+      if (!raw) continue
+      const parsed = JSON.parse(raw) as BudgetState
+      if (parsed?.categories?.length) return parsed
+    } catch { /* corrupt entry — try the next key */ }
+  }
+  return null
+}
 
 interface Store extends BudgetState {
   syncStatus: SyncStatus
@@ -131,6 +170,7 @@ interface Store extends BudgetState {
   addGoal: (g: Omit<Goal, 'id'>) => void
   contribute: (goalId: string, amount: number) => void
   deleteGoal: (id: string) => void
+  restoreBackup: (state: BudgetState) => void
   resetDemo: () => void
   startFresh: () => void
 }
@@ -139,15 +179,10 @@ const Ctx = createContext<Store | null>(null)
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<BudgetState>(() => {
-    try {
-      const raw = localStorage.getItem(KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw) as BudgetState
-        if (parsed.categories?.length) return { ...parsed, categories: mergeCategories(parsed.categories), incomes: parsed.incomes ?? [], goals: parsed.goals ?? [] }
-      }
-    } catch { /* fall through to empty start */ }
+    const saved = readLocal()
     // New users start with a clean slate — demo data is opt-in via the menu.
-    return { transactions: [], categories: DEFAULT_CATEGORIES, goals: [], incomes: [], monthlyIncome: 0 }
+    if (!saved) return emptyState()
+    return { ...saved, categories: mergeCategories(saved.categories), incomes: saved.incomes ?? [], goals: saved.goals ?? [] }
   })
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting')
@@ -159,6 +194,12 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   stateRef.current = state
 
   const inflightRef = useRef<Promise<boolean> | null>(null)
+  // True while we are applying a snapshot from Firestore, so the save effect
+  // does not immediately write the same data back out.
+  const applyingRemoteRef = useRef(false)
+  // True when this device has local edits that have not been flushed yet.
+  const dirtyRef = useRef(false)
+  const unsubDocRef = useRef<(() => void) | null>(null)
 
   // Hydrate from Firestore; returns true if a remote state was loaded.
   const hydrate = (): Promise<boolean> => {
@@ -173,14 +214,15 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     uidRef.current = remoteUid
     householdRef.current = householdId
     if (remote?.categories?.length) {
-      setState({ ...remote, categories: mergeCategories(remote.categories), incomes: remote.incomes ?? [], goals: remote.goals ?? [] }) // fill fields missing from older saves
+      applyingRemoteRef.current = true
+      setState(normalise(remote))
       hydratedRef.current = true
       setSyncStatus('synced')
       return true
     }
     // Nothing saved remotely yet: push this device's budget up.
     hydratedRef.current = true
-    saveRemote(remoteUid, householdId, JSON.parse(localStorage.getItem(KEY) ?? 'null') ?? stateRef.current, () => setSyncStatus('offline'))
+    saveRemote(remoteUid, householdId, stateRef.current, () => setSyncStatus('offline'))
     setSyncStatus('synced')
     return false
   }
@@ -189,26 +231,75 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     hydrate()
-      .then(() => { if (!cancelled) setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) })
-      .catch(() => { if (!cancelled) { hydratedRef.current = true; setSyncStatus('local-only'); setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) } })
+      .then(() => { if (!cancelled) { resubscribe(); setAccount(currentAccount(householdRef.current)) } })
+      .catch(() => { if (!cancelled) { hydratedRef.current = true; setSyncStatus('local-only'); setAccount(currentAccount(householdRef.current)) } })
     const unsub = onAuthChange((user) => {
       logAuth(`auth state → ${user ? (user.email ?? `anon ${user.uid.slice(0, 6)}…`) : 'signed out'}`)
       if (!cancelled && user && user.uid !== uidRef.current) {
         // Account changed (Google sign-in/out) — re-hydrate from the new account.
         hydrate()
-          .then(() => { if (!cancelled) setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) })
-          .catch(() => { if (!cancelled) { setSyncStatus('offline'); setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) } })
+          .then(() => { if (!cancelled) { resubscribe(); setAccount(currentAccount(householdRef.current)) } })
+          .catch(() => { if (!cancelled) { setSyncStatus('offline'); setAccount(currentAccount(householdRef.current)) } })
       }
     })
-    return () => { cancelled = true; unsub() }
+    return () => { cancelled = true; unsub(); unsubDocRef.current?.(); flushRemote() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * Adopt a change written by another device. When this device has nothing
+   * pending we take the remote copy wholesale; when it does, we union the
+   * id-bearing lists so neither side's additions are lost.
+   */
+  const applyRemote = (remote: StoredBudget) => {
+    if (remote.writerId === WRITER_ID) return // our own write coming back
+    const incoming = normalise(remote)
+    applyingRemoteRef.current = true
+    setState((mine) => {
+      if (!dirtyRef.current) return incoming
+      return {
+        ...incoming,
+        transactions: unionById(mine.transactions, incoming.transactions)
+          .sort((a, b) => b.date.localeCompare(a.date)),
+        goals: unionById(mine.goals, incoming.goals),
+        incomes: unionById(mine.incomes, incoming.incomes),
+        categories: mergeCategories(mine.categories),
+        monthlyIncome: mine.monthlyIncome,
+      }
+    })
+  }
+
+  /** (Re)attach the live listener for whichever document we are now reading. */
+  const resubscribe = () => {
+    unsubDocRef.current?.()
+    unsubDocRef.current = null
+    if (!uidRef.current) return
+    unsubDocRef.current = subscribeRemote(
+      uidRef.current,
+      householdRef.current,
+      applyRemote,
+      () => setSyncStatus('offline'),
+    )
+  }
+
   useEffect(() => {
     try { localStorage.setItem(KEY, JSON.stringify(state)) } catch { /* storage full */ }
+    if (applyingRemoteRef.current) {
+      // This render came from a snapshot, not a user edit — do not echo it back.
+      applyingRemoteRef.current = false
+      dirtyRef.current = false
+      return
+    }
     if (hydratedRef.current && uidRef.current) {
-      setSyncStatus((s) => (s === 'synced' ? 'synced' : s))
-      saveRemote(uidRef.current, householdRef.current, state, () => setSyncStatus('offline'))
+      dirtyRef.current = true
+      saveRemote(
+        uidRef.current,
+        householdRef.current,
+        { ...state, writerId: WRITER_ID, updatedAt: Date.now() },
+        () => setSyncStatus('offline'),
+      )
+      // The write is queued; the snapshot echo clears the flag for real.
+      setTimeout(() => { dirtyRef.current = false }, 1500)
     }
   }, [state])
 
@@ -219,35 +310,49 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     signInGoogle: async () => {
       await signInWithGoogle()
       await hydrate()
-      setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
+      resubscribe()
+      setAccount(currentAccount(householdRef.current))
     },
     signOut: async () => {
+      // Clear this device before the new anonymous session starts, or the budget
+      // we just signed out of gets pushed straight into the anonymous account.
+      const blank = emptyState()
+      stateRef.current = blank
+      setState(blank)
+      uidRef.current = null
+      householdRef.current = null
+      hydratedRef.current = false
+      try { localStorage.removeItem(KEY); for (const k of LEGACY_KEYS) localStorage.removeItem(k) } catch { /* ignore */ }
       await signOutAccount()
       await hydrate()
-      setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
+      resubscribe()
+      setAccount(currentAccount(householdRef.current))
     },
     createInvite: async () => {
       const code = await createHousehold()
       const uid = uidRef.current!
       householdRef.current = uid
       // Move the current budget into the household doc so the partner sees it.
-      await pushStateNow(uid, uid, stateRef.current)
-      setAccount(currentAccount() ? { ...currentAccount()!, householdId: uid } : null)
+      await pushStateNow(uid, uid, { ...stateRef.current, writerId: WRITER_ID, updatedAt: Date.now() })
+      resubscribe()
+      setAccount(currentAccount(uid))
       return code
     },
     joinInvite: async (code) => {
       await joinHousehold(code)
       await hydrate() // pulls the shared budget down (or pushes local up if empty)
-      setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
+      resubscribe()
+      setAccount(currentAccount(householdRef.current))
     },
     leaveHousehold: async () => {
       await leaveHousehold()
       await hydrate()
-      setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
+      resubscribe()
+      setAccount(currentAccount(householdRef.current))
     },
     importLocal: async () => {
       if (!uidRef.current) throw new Error('not-signed-in')
-      await pushStateNow(uidRef.current, householdRef.current, stateRef.current)
+      await pushStateNow(uidRef.current, householdRef.current, { ...stateRef.current, writerId: WRITER_ID, updatedAt: Date.now() })
     },
     addTransaction: (t) => {
       if (t.amount > 0) { playChaching(); breatheFire() } // manual expenses only — imports stay quiet
@@ -262,28 +367,37 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       ...s, transactions: s.transactions.map((t) => (t.id === id ? { ...t, categoryId } : t)),
     })),
     importTransactions: (rows) => {
+      // Counts are derived from the current state up front, never from inside the
+      // setState updater — React does not promise to run updaters synchronously.
       const importId = uid()
-      let added = 0
-      setState((s) => {
-        const seen = new Set(s.transactions.map((t) => `${t.date}|${t.merchant}|${t.amount}`))
-        const fresh = rows
-          .map((r) => ({ ...r, merchant: cleanMerchant(r.merchant) }))
-          .filter((r) => !seen.has(`${r.date}|${r.merchant}|${r.amount}`))
-        added = fresh.length
-        return {
+      const current = stateRef.current
+      // Duplicate detection is per-occurrence, not per-key: two identical coffees
+      // on the same day are two real transactions, so only skip as many as we
+      // already hold.
+      const budget = new Map<string, number>()
+      for (const t of current.transactions) {
+        const k = `${t.date}|${t.merchant}|${t.amount}`
+        budget.set(k, (budget.get(k) ?? 0) + 1)
+      }
+      const fresh: Transaction[] = []
+      for (const r of rows) {
+        const merchant = cleanMerchant(r.merchant)
+        const k = `${r.date}|${merchant}|${r.amount}`
+        const remaining = budget.get(k) ?? 0
+        if (remaining > 0) { budget.set(k, remaining - 1); continue } // already have this one
+        fresh.push({ ...r, merchant, id: uid(), importId, categoryId: categorize(merchant, current.categories) })
+      }
+      if (fresh.length) {
+        setState((s) => ({
           ...s,
-          transactions: [...fresh.map((r) => ({ ...r, id: uid(), importId, categoryId: categorize(r.merchant, s.categories) })), ...s.transactions]
-            .sort((a, b) => b.date.localeCompare(a.date)),
-        }
-      })
-      return { added, importId }
+          transactions: [...fresh, ...s.transactions].sort((a, b) => b.date.localeCompare(a.date)),
+        }))
+      }
+      return { added: fresh.length, importId }
     },
     undoImport: (importId) => {
-      let removed = 0
-      setState((s) => {
-        removed = s.transactions.filter((t) => t.importId === importId).length
-        return { ...s, transactions: s.transactions.filter((t) => t.importId !== importId) }
-      })
+      const removed = stateRef.current.transactions.filter((t) => t.importId === importId).length
+      if (removed) setState((s) => ({ ...s, transactions: s.transactions.filter((t) => t.importId !== importId) }))
       return removed
     },
     setLimit: (categoryId, limit) => setState((s) => ({
@@ -299,6 +413,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       ...s, goals: s.goals.map((g) => (g.id === goalId ? { ...g, saved: Math.max(0, Math.min(g.target, g.saved + amount)) } : g)),
     })),
     deleteGoal: (id) => setState((s) => ({ ...s, goals: s.goals.filter((g) => g.id !== id) })),
+    restoreBackup: (restored) => setState({ ...restored, categories: mergeCategories(restored.categories) }),
     resetDemo: () => setState(seedState()),
     startFresh: () => setState((s) => ({
       ...s,

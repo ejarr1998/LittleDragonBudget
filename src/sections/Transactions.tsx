@@ -3,7 +3,6 @@ import { ArrowDownLeft, Trash2, Upload, Repeat, Undo2, Info, Plus } from 'lucide
 import { useBudget } from '@/lib/store'
 import { ConfirmDialog, useConfirm } from '@/components/app/ConfirmDialog'
 import { categorize, fmt, monthKey, parseCSV, todayKey } from '@/lib/money'
-import { parseStatementPDF } from '@/lib/pdf'
 import { CategoryIcon } from '@/components/app/ui'
 import { CategoryPicker } from '@/components/app/CategoryPicker'
 import { MerchantAutocomplete } from '@/components/app/MerchantAutocomplete'
@@ -65,6 +64,8 @@ export function Transactions({ month }: { month: string }) {
       let rows: { date: string; merchant: string; amount: number }[]
       let skipped = 0
       if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') {
+        // pdf.js is ~1.2 MB — keep it out of the initial bundle.
+        const { parseStatementPDF } = await import('@/lib/pdf')
         const res = await parseStatementPDF(f)
         rows = res.rows; skipped = res.skipped
       } else {

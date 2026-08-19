@@ -39,27 +39,32 @@ export function SegBar({ pct, color, segments = 24 }: { pct: number; color: stri
 /** Donut chart of spending by category. */
 export function Donut({ data, total, centerLabel = 'spent' }: { data: { label: string; value: number; color: string }[]; total: number; centerLabel?: string }) {
   const R = 42, C = 2 * Math.PI * R
-  let acc = 0
-  const slices = data.filter((d) => d.value > 0)
+  // Offsets are computed up front: mutating an accumulator while mapping is a
+  // side effect during render, which breaks under the React Compiler.
+  const slices = data
+    .filter((d) => d.value > 0)
+    .reduce<{ label: string; color: string; value: number; frac: number; offset: number }[]>((acc, d) => {
+      const frac = d.value / Math.max(total, 0.01)
+      const offset = acc.length ? acc[acc.length - 1].offset + acc[acc.length - 1].frac : 0
+      acc.push({ ...d, frac, offset })
+      return acc
+    }, [])
   return (
     <div className="relative w-full aspect-square max-w-[220px] mx-auto">
       <svg viewBox="0 0 100 100" className="w-full -rotate-90">
         <circle cx="50" cy="50" r={R} fill="none" stroke="rgba(14,26,28,0.07)" strokeWidth="11" />
         {slices.map((s) => {
-          const frac = s.value / Math.max(total, 0.01)
-          const dash = frac * C
-          const el = (
+          const dash = s.frac * C
+          return (
             <circle
               key={s.label} cx="50" cy="50" r={R} fill="none"
               stroke={s.color} strokeWidth="11" strokeLinecap="butt"
               strokeDasharray={`${Math.max(dash - 0.8, 0.4)} ${C - dash + 0.8}`}
-              strokeDashoffset={-acc * C}
+              strokeDashoffset={-s.offset * C}
             >
               <title>{s.label}: {fmt(s.value)}</title>
             </circle>
           )
-          acc += frac
-          return el
         })}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">

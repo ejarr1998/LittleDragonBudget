@@ -26,10 +26,24 @@ export const shiftMonth = (key: string, delta: number) => {
   return monthKey(d)
 }
 
-export const todayKey = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/**
+ * Parse a date cell from a bank export into a local Date.
+ * Bare ISO strings ("2026-01-02") are parsed as UTC midnight by JS, which lands
+ * on the previous day west of Greenwich. Pin those to local midnight instead.
+ */
+export function parseDateCell(raw: string): Date {
+  const s = raw.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(`${s}T00:00:00`)
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})\b/)
+  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]))
+  return new Date(s)
 }
+
+/** Format a Date as the app's YYYY-MM-DD key, in local time. */
+export const dateKey = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+export const todayKey = () => dateKey(new Date())
 
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
 
@@ -77,9 +91,9 @@ export function parseCSV(text: string): { rows: { date: string; merchant: string
     // naive CSV with quote support
     const cells = line.match(/("([^"]|"")*"|[^,]*)(,|$)/g)?.map((c) => c.replace(/,$/, '').replace(/^"|"$/g, '').replace(/""/g, '"').trim()) ?? []
     const rawDate = di >= 0 ? cells[di] : cells[0]
-    const d = new Date(rawDate)
+    const d = parseDateCell(rawDate ?? '')
     if (isNaN(d.getTime())) { skipped++; continue }
-    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const date = dateKey(d)
     const merchant = (ni >= 0 ? cells[ni] : cells[1]) || 'Unknown'
     let amount = 0
     if (ai >= 0) {
