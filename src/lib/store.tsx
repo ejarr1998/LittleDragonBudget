@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BudgetState, Category, Goal, IncomeSource, Transaction } from '@/types'
 import { categorize, monthKey, uid } from '@/lib/money'
+import { playChaching } from '@/lib/sound'
 import {
   loadRemote, saveRemote, pushStateNow, onAuthChange, signInWithGoogle,
   signOutAccount, createHousehold, joinHousehold, leaveHousehold,
@@ -237,11 +238,14 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       if (!uidRef.current) throw new Error('not-signed-in')
       await pushStateNow(uidRef.current, householdRef.current, stateRef.current)
     },
-    addTransaction: (t) => setState((s) => ({
-      ...s,
-      transactions: [{ ...t, id: uid(), categoryId: t.categoryId ?? categorize(t.merchant, s.categories) }, ...s.transactions]
-        .sort((a, b) => b.date.localeCompare(a.date)),
-    })),
+    addTransaction: (t) => {
+      if (t.amount > 0) playChaching() // manual expenses only — imports don't chime
+      setState((s) => ({
+        ...s,
+        transactions: [{ ...t, id: uid(), categoryId: t.categoryId ?? categorize(t.merchant, s.categories) }, ...s.transactions]
+          .sort((a, b) => b.date.localeCompare(a.date)),
+      }))
+    },
     deleteTransaction: (id) => setState((s) => ({ ...s, transactions: s.transactions.filter((t) => t.id !== id) })),
     recategorize: (id, categoryId) => setState((s) => ({
       ...s, transactions: s.transactions.map((t) => (t.id === id ? { ...t, categoryId } : t)),
