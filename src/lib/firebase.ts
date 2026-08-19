@@ -237,6 +237,12 @@ export function currentAccount(householdId: string | null = null): AccountInfo |
  * combined with the UA check it identifies this one specific environment.
  * iPadOS 13+ reports a desktop Safari UA, hence the touch-points fallback.
  */
+/**
+ * Whether this session is a standalone iOS home-screen app, where sign-in
+ * cannot complete in-app (see the SIGN-IN NOTE at the call site in
+ * AccountSheet.tsx for the mechanism and why a real <a target="_blank">
+ * element, not a JS-triggered click, is required to escape to Safari).
+ */
 export function isIOSStandalone(): boolean {
   const iOSDevice = /iPhone|iPad|iPod/.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
@@ -245,33 +251,10 @@ export function isIOSStandalone(): boolean {
 }
 
 /**
- * Escape a standalone iOS home-screen app into Safari, on the same URL.
- *
- * Redirect-based sign-in does not work here: navigating to an external origin
- * from a standalone iOS web app hands off to Safari as a separate app/process,
- * not a window inside the installed app. Google's own redirect back afterward
- * lands in that Safari instance, which is not the same context the home-screen
- * icon reopens — so the icon never sees a result, regardless of how many times
- * it's retried. This was confirmed against a live device: two redirect
- * attempts, both came back with a clean URL and no pending result.
- *
- * A programmatic click on an <a target="_blank"> is the standard, reliable way
- * to force that Safari hand-off on iOS (plain location.href / window.open do
- * not reliably trigger it from standalone mode). Sign-in then happens
- * entirely inside ordinary Safari, which already works — Auth storage for the
- * origin is shared between Safari and the installed icon, so reopening the
- * icon afterward should show the signed-in state without any special
- * redirect-completion handling.
+ * Live URL for the app — the one fixed point the Safari hand-off link and the
+ * "copy site link" button both need to agree on.
  */
-export function openInSafariForSignIn(): void {
-  const a = document.createElement('a')
-  a.href = `${location.origin}${location.pathname}` // drop any stale query params
-  a.target = '_blank'
-  a.rel = 'noopener'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-}
+export const SITE_URL = 'https://ejarr1998.github.io/LittleDragonBudget/'
 
 async function startRedirectSignIn(provider: GoogleAuthProvider, reason: string): Promise<never> {
   if (!auth) throw new Error('firebase-unavailable')

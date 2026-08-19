@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud, Download, FileUp } from 'lucide-react'
 import { useBudget } from '@/lib/store'
-import { getLastAuthError, getAuthLog, getRedirectPatchStatus, isIOSStandalone, openInSafariForSignIn, INVITE_CODE_LENGTH } from '@/lib/firebase'
+import { getLastAuthError, getAuthLog, getRedirectPatchStatus, isIOSStandalone, SITE_URL, INVITE_CODE_LENGTH } from '@/lib/firebase'
 import { exportBackup, readBackup } from '@/lib/backup'
 
 /** Account & sharing sheet — Google sign-in, household invite codes, local import. */
@@ -107,18 +107,44 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                 <p className="text-[11px] text-[#3d4d50] mt-1 leading-relaxed">
                   Right now this budget is tied to an anonymous session on this device. Sign in to attach it to your Google account — then you can share it.
                 </p>
-                <button
-                  onClick={() => needsSafariHandoff ? openInSafariForSignIn() : run('in', signInGoogle)}
-                  disabled={busy !== null}
-                  className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
-                >
-                  <LogIn size={14} /> {needsSafariHandoff ? 'Open Safari to sign in' : busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
-                </button>
+                {needsSafariHandoff ? (
+                  // SIGN-IN NOTE: this must be a real <a target="_blank"> the person
+                  // taps directly — a JS-triggered .click() on a detached anchor was
+                  // tried first and confirmed (on-device) to just navigate in place
+                  // inside the same standalone webview instead of escaping to Safari.
+                  // iOS only honors the escape for a genuine, trusted tap on the
+                  // anchor element itself.
+                  <a
+                    href={SITE_URL}
+                    target="_blank"
+                    rel="noopener"
+                    className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors w-fit"
+                  >
+                    <LogIn size={14} /> Open Safari to sign in
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => run('in', signInGoogle)}
+                    disabled={busy !== null}
+                    className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
+                  >
+                    <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
+                  </button>
+                )}
                 {needsSafariHandoff && (
                   <div className="mt-3 rounded-[12px] bg-[#eef6f7] p-3">
                     <p className="text-[11px] text-[#3d4d50] leading-relaxed">
-                      iOS keeps this installed icon separate from Safari, so Google sign-in can't finish without leaving it. Tap the button above — it opens this same page in Safari. Sign in there, then come back and reopen this icon; it'll already show you signed in.
+                      iOS keeps this installed icon separate from Safari, so Google sign-in can't finish without leaving it. Tap the link above — it opens this same page in Safari. Sign in there, then come back and reopen this icon; it'll already show you signed in.
                     </p>
+                    <p className="text-[11px] text-[#7a9aa0] mt-1.5 leading-relaxed">
+                      If tapping it doesn't visibly leave this app, copy the link below and paste it into Safari directly instead.
+                    </p>
+                    <button
+                      onClick={() => { navigator.clipboard?.writeText(SITE_URL); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+                      className="mt-2 flex items-center gap-1.5 rounded-full border border-[#c4dbe0] px-3.5 py-1.5 text-xs font-medium text-[#3d4d50] hover:border-[#0f5257] transition-colors"
+                    >
+                      {copied ? <Check size={12} className="text-[#1f7a4d]" /> : <Copy size={12} />} {copied ? 'Link copied' : 'Copy site link'}
+                    </button>
                   </div>
                 )}
                 {handoffBlocked && !needsSafariHandoff && (
@@ -143,7 +169,7 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                       You're in the installed app. If sign-in keeps bouncing you back here, your browser may be swallowing the result. Try opening the site in your normal browser, sign in there, then join this device with an invite code.
                     </p>
                     <button
-                      onClick={() => { navigator.clipboard?.writeText('https://ejarr1998.github.io/LittleDragonBudget/'); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+                      onClick={() => { navigator.clipboard?.writeText(SITE_URL); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
                       className="mt-2 flex items-center gap-1.5 rounded-full border border-[#c4dbe0] px-3.5 py-1.5 text-xs font-medium text-[#3d4d50] hover:border-[#0f5257] transition-colors"
                     >
                       {copied ? <Check size={12} className="text-[#1f7a4d]" /> : <Copy size={12} />} {copied ? 'Link copied' : 'Copy site link'}
