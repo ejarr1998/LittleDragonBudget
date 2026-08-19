@@ -2,7 +2,8 @@ import { initializeApp } from 'firebase/app'
 import {
   getAuth, onAuthStateChanged, signInAnonymously, signOut,
   GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
-  browserPopupRedirectResolver, browserLocalPersistence,
+  browserPopupRedirectResolver, browserLocalPersistence, browserSessionPersistence,
+  setPersistence,
   type Auth, type User,
 } from 'firebase/auth'
 import { deleteDoc, doc, getDoc, getFirestore, onSnapshot, setDoc, type Firestore } from 'firebase/firestore'
@@ -232,11 +233,32 @@ export async function signInWithGoogle(): Promise<User> {
   if (!auth) throw new Error('firebase-unavailable')
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: 'select_account' })
+
+  // Firebase's default persistence writes the signed-in user to IndexedDB, and
+  // that layer closes its connection the instant document.visibilityState goes
+  // 'hidden' — with no retry if a write lands while still hidden. On some
+  // devices (Android tablets in particular) opening the sign-in popup flips the
+  // opener tab to hidden while focus is on the popup, so the credential arrives
+  // right as the write gets refused: "Database is closing/hidden". This is not
+  // a fluke — it's the SDK's own guard doing exactly what it's built to do.
+  //
+  // sessionStorage-backed persistence is synchronous and has no such guard, so
+  // it's a safe landing zone for the credential during the popup. Once we're
+  // back in the foreground we migrate it into durable storage.
+  const usingSession = await trySetPersistence(browserSessionPersistence, 'session (pre-popup)')
+
   try {
     logAuth('opening Google popup…')
     const cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver)
     logAuth(`popup OK → ${cred.user.email ?? cred.user.uid}`)
     try { localStorage.removeItem('ldb-signin-attempt') } catch { /* ignore */ }
+
+    if (usingSession) {
+      // Migrate to durable storage now that the tab is back in the foreground.
+      // If this still races (unlikely — the popup has closed by now), the user
+      // stays signed in for this tab session rather than losing the sign-in.
+      await trySetPersistence(browserLocalPersistence, 'local (post-popup)')
+    }
     return cred.user
   } catch (e) {
     const code = (e as { code?: string }).code ?? ''
@@ -253,6 +275,18 @@ export async function signInWithGoogle(): Promise<User> {
     noteError('popup-sign-in', e)
     logAuth(`popup FAILED → ${code || String(e)}`)
     throw e
+  }
+}
+
+/** setPersistence, but logged and never fatal — the sign-in itself matters more than which storage it lands in. */
+async function trySetPersistence(p: typeof browserLocalPersistence, label: string): Promise<boolean> {
+  if (!auth) return false
+  try {
+    await setPersistence(auth, p)
+    return true
+  } catch (e) {
+    logAuth(`could not switch to ${label} persistence — continuing anyway (${(e as Error).message})`)
+    return false
   }
 }
 

@@ -55,6 +55,8 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
               ? 'That code did not match any household, or it has already been used. Ask for a fresh one.'
             : c.message === 'expired-code'
               ? 'That invite code has expired. Invite codes last 7 days — generate a new one.'
+            : /database is closing/i.test(c.message ?? '')
+              ? "Sign-in almost completed but the browser closed its storage mid-handoff. This is usually a one-off — tap Sign in again."
               : `Sign-in failed (${c.code ?? c.message ?? 'unknown error'}). Tell me this code and I can pin it down.`
       )
     } finally { setBusy(null); setAuthDebug(getLastAuthError()) }
