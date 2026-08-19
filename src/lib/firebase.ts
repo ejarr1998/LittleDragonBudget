@@ -229,10 +229,44 @@ export function currentAccount(householdId: string | null = null): AccountInfo |
  * Redirect stays as the fallback for the case where the popup is genuinely
  * blocked.
  */
+/**
+ * True only for an iOS/iPadOS web app launched from its home-screen icon.
+ * `navigator.standalone` is a WebKit-only flag that exists nowhere else, so
+ * combined with the UA check it identifies this one specific environment.
+ * iPadOS 13+ reports a desktop Safari UA, hence the touch-points fallback.
+ */
+function isIOSStandalone(): boolean {
+  const iOSDevice = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true
+  return iOSDevice && standalone
+}
+
+async function startRedirectSignIn(provider: GoogleAuthProvider, reason: string): Promise<never> {
+  if (!auth) throw new Error('firebase-unavailable')
+  logAuth(`starting redirect sign-in (${reason}) [patch: ${redirectPatch}]`)
+  try { localStorage.setItem('ldb-signin-attempt', String(Date.now())) } catch { /* ignore */ }
+  await signInWithRedirect(auth, provider)
+  throw new Error('redirecting') // page navigates away; unreachable
+}
+
 export async function signInWithGoogle(): Promise<User> {
   if (!auth) throw new Error('firebase-unavailable')
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: 'select_account' })
+
+  // A home-screen iOS web app is a single WKWebView with no browser chrome —
+  // there is nowhere for window.open() to put a second window. It typically
+  // returns a reference to nothing usable, and Firebase's popup flow then
+  // polls that reference for a 'closed' state that will never arrive: the
+  // sign-in promise never resolves and never rejects. That's a silent hang,
+  // not an error — nothing to catch, which is why it looked like the button
+  // simply did nothing. Redirect is the only flow that works here, because
+  // standalone iOS *can* navigate its one webview to another page and back;
+  // it just cannot open a second one.
+  if (isIOSStandalone()) {
+    return startRedirectSignIn(provider, 'iOS home-screen app — popup cannot open a second window here')
+  }
 
   // Firebase's default persistence writes the signed-in user to IndexedDB, and
   // that layer closes its connection the instant document.visibilityState goes
@@ -247,9 +281,21 @@ export async function signInWithGoogle(): Promise<User> {
   // back in the foreground we migrate it into durable storage.
   const usingSession = await trySetPersistence(browserSessionPersistence, 'session (pre-popup)')
 
+  // Belt-and-suspenders for any environment we haven't specifically detected:
+  // if the popup never resolves within a reasonable window, stop waiting on it
+  // and fall back to redirect instead of leaving the UI stuck indefinitely.
+  const HANG_TIMEOUT_MS = 12_000
+  let timedOut = false
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => { timedOut = true; reject(new Error('popup-timeout')) }, HANG_TIMEOUT_MS)
+  })
+
   try {
     logAuth('opening Google popup…')
-    const cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver)
+    const cred = await Promise.race([
+      signInWithPopup(auth, provider, browserPopupRedirectResolver),
+      timeout,
+    ])
     logAuth(`popup OK → ${cred.user.email ?? cred.user.uid}`)
     try { localStorage.removeItem('ldb-signin-attempt') } catch { /* ignore */ }
 
@@ -261,16 +307,17 @@ export async function signInWithGoogle(): Promise<User> {
     }
     return cred.user
   } catch (e) {
+    if (timedOut || (e as Error).message === 'popup-timeout') {
+      logAuth(`popup did not resolve within ${HANG_TIMEOUT_MS / 1000}s — falling back to redirect`)
+      return startRedirectSignIn(provider, 'popup timed out')
+    }
     const code = (e as { code?: string }).code ?? ''
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
       logAuth('popup closed by user')
       throw new Error('cancelled') // user closed it — not a real failure
     }
     if (code === 'auth/popup-blocked' || code === 'auth/popup-failed' || code === 'auth/operation-not-supported-in-this-environment') {
-      logAuth(`popup unavailable (${code}) — falling back to redirect [patch: ${redirectPatch}]`)
-      try { localStorage.setItem('ldb-signin-attempt', String(Date.now())) } catch { /* ignore */ }
-      await signInWithRedirect(auth, provider)
-      throw new Error('redirecting') // page navigates away; unreachable
+      return startRedirectSignIn(provider, `popup unavailable (${code})`)
     }
     noteError('popup-sign-in', e)
     logAuth(`popup FAILED → ${code || String(e)}`)
