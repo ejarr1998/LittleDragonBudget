@@ -112,7 +112,8 @@ export async function loadRemote(): Promise<{ uid: string; householdId: string |
             noteError('redirect-result', new Error('auth/missing-redirect-event — the sign-in response arrived but the app lost track of the attempt (browser/app storage split)'))
             logAuth('FAILED: sign-in came back but the app lost the attempt (installed-app vs browser split)')
           } else {
-            logAuth('sign-in attempt never returned to this window — did it finish in a different app/browser?')
+            noteError('redirect-result', new Error('auth/handoff-blocked — Google completed the sign-in, but your browser blocked the handoff back to the app (third-party cookies / tracking protection)'))
+            logAuth('FAILED: Google finished but the handoff was blocked — enable third-party cookies for this site')
           }
         }
       } catch { /* ignore */ }

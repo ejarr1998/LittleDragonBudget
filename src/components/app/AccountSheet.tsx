@@ -20,9 +20,16 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
     (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true
 
+  const [handoffBlocked, setHandoffBlocked] = useState(false)
+
   // Refresh diagnostics every time the sheet opens
   useEffect(() => {
-    if (open) { setAuthDebug(getLastAuthError()); setAuthLog(getAuthLog()) }
+    if (open) {
+      const err = getLastAuthError()
+      setAuthDebug(err)
+      setAuthLog(getAuthLog())
+      setHandoffBlocked(!!err && (err.includes('handoff-blocked') || err.includes('missing-redirect-event')))
+    }
   }, [open])
 
   if (!open) return null
@@ -95,7 +102,23 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                 >
                   <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
                 </button>
-                {isInstalledApp && (
+                {handoffBlocked && (
+                  <div className="mt-3 rounded-[12px] bg-[#fdf3e7] border border-[#ecd9b8] p-3">
+                    <p className="text-[11px] font-semibold text-[#8a6d1a]">We know what's blocking it</p>
+                    <p className="text-[11px] text-[#6b5716] mt-1 leading-relaxed">
+                      Google finishes your sign-in, but your phone blocks the handoff back to the app. The fix is a browser setting:
+                    </p>
+                    <ol className="text-[11px] text-[#6b5716] mt-1.5 ml-4 list-decimal space-y-1 leading-relaxed">
+                      <li>Open <b>Chrome</b> → <b>⋮</b> → <b>Settings</b> → <b>Site settings</b> → <b>Third-party cookies</b></li>
+                      <li>Choose <b>"Allow third-party cookies"</b> (or add an exception for this site)</li>
+                      <li>Come back and tap Sign in again</li>
+                    </ol>
+                    <p className="text-[11px] text-[#6b5716] mt-1.5 leading-relaxed">
+                      (On an iPhone: Settings → Safari → turn off "Prevent Cross-Site Tracking".)
+                    </p>
+                  </div>
+                )}
+                {isInstalledApp && !handoffBlocked && (
                   <div className="mt-3 rounded-[12px] bg-[#eef6f7] p-3">
                     <p className="text-[11px] text-[#3d4d50] leading-relaxed">
                       You're in the installed app. If sign-in keeps bouncing you back here, your browser may be swallowing the result. Try opening the site in your normal browser, sign in there, then join this device with an invite code.
