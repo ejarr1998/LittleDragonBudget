@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud } from 'lucide-react'
 import { useBudget } from '@/lib/store'
-import { getLastAuthError } from '@/lib/firebase'
+import { getLastAuthError, getAuthLog } from '@/lib/firebase'
 
 /** Account & sharing sheet — Google sign-in, household invite codes, local import. */
 export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -15,8 +15,12 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [imported, setImported] = useState(false)
   const [authDebug, setAuthDebug] = useState<string | null>(() => getLastAuthError())
 
+  const [authLog, setAuthLog] = useState<string[]>([])
+
   // Refresh diagnostics every time the sheet opens
-  useEffect(() => { if (open) setAuthDebug(getLastAuthError()) }, [open])
+  useEffect(() => {
+    if (open) { setAuthDebug(getLastAuthError()); setAuthLog(getAuthLog()) }
+  }, [open])
 
   if (!open) return null
 
@@ -92,16 +96,25 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
             )}
           </div>
 
-          {/* Diagnostics — shows the real reason sign-in didn't stick */}
-          {authDebug && (
-            <div className="rounded-[16px] bg-[#fdf3e7] border border-[#ecd9b8] p-3.5">
-              <div className="text-[11px] font-semibold text-[#8a6d1a]">Sign-in diagnostic</div>
-              <p className="text-[11px] text-[#6b5716] mt-0.5 leading-relaxed break-words font-mono-num">{authDebug}</p>
-              <p className="text-[11px] text-[#6b5716] mt-1 leading-relaxed">
-                Send me this message and I'll know exactly what's blocking you.
-              </p>
+          {/* Sign-in status & diagnostics — always visible so we can see what's happening */}
+          <div className={`rounded-[16px] border p-3.5 ${authDebug ? 'bg-[#fdf3e7] border-[#ecd9b8]' : 'bg-white border-[#e2eef1]'}`}>
+            <div className={`text-[11px] font-semibold ${authDebug ? 'text-[#8a6d1a]' : 'text-[#3d4d50]'}`}>
+              Sign-in status: {account?.isGoogle ? `signed in as ${account.email}` : account ? 'anonymous session (not signed in)' : 'starting…'} · {syncStatus}
             </div>
-          )}
+            {authDebug && (
+              <p className="text-[11px] text-[#8a3c33] mt-1 leading-relaxed break-words font-mono-num">Error: {authDebug}</p>
+            )}
+            {authLog.length > 0 && (
+              <div className="mt-1.5 space-y-0.5">
+                {authLog.map((l, i) => (
+                  <p key={i} className="text-[10px] text-[#5b7076] leading-snug break-words font-mono-num">{l}</p>
+                ))}
+              </div>
+            )}
+            <p className={`text-[10px] mt-1.5 leading-relaxed ${authDebug ? 'text-[#6b5716]' : 'text-[#7a9aa0]'}`}>
+              If sign-in isn't sticking, send me a screenshot of this box — it records exactly what happened.
+            </p>
+          </div>
 
           {/* Household sharing — Google accounts only */}
           {account?.isGoogle && (
@@ -150,8 +163,7 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                     </button>
                   )}
                   <div className="flex gap-2">
-                    <input
-                      autoComplete="off"
+                    <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
                       value={joinCode}
                       onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                       placeholder="Enter code"

@@ -60,8 +60,7 @@ export function MerchantAutocomplete({
 
   return (
     <div ref={wrapRef} className={`relative ${className}`}>
-      <input
-        autoComplete="off"
+      <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
         value={value}
         onChange={(e) => { onChange(e.target.value); setOpen(true); setHighlight(0) }}
         onFocus={() => setOpen(true)}

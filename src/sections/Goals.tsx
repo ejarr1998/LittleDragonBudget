@@ -76,7 +76,7 @@ export function Goals() {
               </div>
               {contribFor === g.id ? (
                 <div className="mt-4 flex items-center gap-1.5">
-                  <input autoComplete="off"
+                  <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
                     autoFocus type="number" min="0" value={contribAmt}
                     onChange={(e) => setContribAmt(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && submitContrib(g.id, 1)}
@@ -104,12 +104,12 @@ export function Goals() {
         {adding && (
           <div data-animation="fade-in" className="rounded-[20px] bg-white p-6 border-2 border-dashed border-[#2a9aa2]">
             <h3 className="font-display text-xl">New goal</h3>
-            <input autoComplete="off"
+            <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
               autoFocus value={name} onChange={(e) => setName(e.target.value)}
               placeholder="e.g. House deposit"
               className="mt-4 w-full rounded-[14px] bg-[#ddedf0]/60 px-4 py-3 text-sm outline-none focus:ring-2 ring-[#0f5257]"
             />
-            <input autoComplete="off"
+            <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
               type="number" min="0" value={target} onChange={(e) => setTarget(e.target.value)}
               placeholder="Target amount"
               className="mt-2.5 w-full rounded-[14px] bg-[#ddedf0]/60 px-4 py-3 text-sm tnum outline-none focus:ring-2 ring-[#0f5257]"

@@ -46,6 +46,19 @@ export function clearAuthError() {
   try { sessionStorage.removeItem('ldb-auth-debug') } catch { /* ignore */ }
 }
 
+/** Timestamped auth event log so we can see exactly what happened during sign-in. */
+export function logAuth(msg: string) {
+  try {
+    const log: string[] = JSON.parse(sessionStorage.getItem('ldb-auth-log') ?? '[]')
+    log.push(`${new Date().toLocaleTimeString()} ${msg}`)
+    sessionStorage.setItem('ldb-auth-log', JSON.stringify(log.slice(-12)))
+  } catch { /* private mode */ }
+}
+
+export function getAuthLog(): string[] {
+  try { return JSON.parse(sessionStorage.getItem('ldb-auth-log') ?? '[]') } catch { return [] }
+}
+
 try {
   const app = initializeApp(firebaseConfig)
   auth = getAuth(app)
@@ -80,20 +93,35 @@ export async function loadRemote(): Promise<{ uid: string; householdId: string |
   // Complete a Google redirect sign-in if we just came back from one
   try {
     const res = await getRedirectResult(auth)
-    if (res?.user) clearAuthError()
+    if (res?.user) {
+      clearAuthError()
+      logAuth(`redirect OK → ${res.user.email ?? res.user.uid}`)
+    } else {
+      logAuth('no redirect result pending')
+    }
   } catch (e) {
     noteError('redirect-result', e) // surfaced in the account sheet
+    logAuth(`redirect FAILED → ${(e as { code?: string }).code ?? e}`)
   }
   if (!auth.currentUser) {
-    try { await signInAnonymously(auth) } catch (e) { noteError('anon-sign-in', e); throw e }
+    try {
+      const cred = await signInAnonymously(auth)
+      logAuth(`anonymous session → ${cred.user.uid.slice(0, 6)}…`)
+    } catch (e) {
+      noteError('anon-sign-in', e)
+      logAuth(`anonymous FAILED → ${(e as { code?: string }).code ?? e}`)
+      throw e
+    }
   }
   const uid = auth.currentUser!.uid
   const householdId = await getHouseholdId(uid)
   let snap
   try {
     snap = await getDoc(docFor(uid, householdId))
+    logAuth(`budget load OK (${snap.exists() ? 'found saved budget' : 'nothing saved yet'})`)
   } catch (e) {
     noteError('load-budget (firestore rules?)', e)
+    logAuth(`budget load FAILED → ${(e as { code?: string }).code ?? e}`)
     throw e
   }
   return { uid, householdId, state: snap.exists() ? (snap.data() as BudgetState) : null }

@@ -125,7 +125,7 @@ export function Transactions({ month }: { month: string }) {
           />
           <div className="relative w-32">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[#7a9aa0]">$</span>
-            <input autoComplete="off"
+            <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
               ref={qAmountRef}
               value={qAmount}
               onChange={(e) => setQAmount(e.target.value)}
@@ -185,7 +185,7 @@ export function Transactions({ month }: { month: string }) {
         >
           <Upload size={13} /> {parsing ? 'Reading…' : 'Import'}
         </button>
-        <input autoComplete="off"
+        <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
           ref={fileRef} type="file" accept=".csv,.pdf,text/csv,application/pdf" className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = '' }}
         />
@@ -236,7 +236,7 @@ export function Transactions({ month }: { month: string }) {
           <option value="all">All categories</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <input autoComplete="off"
+        <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
           value={query} onChange={(e) => setQuery(e.target.value)}
           placeholder="Search merchant…"
           className="flex-1 min-w-[160px] rounded-full bg-white px-4 py-2 text-xs outline-none focus:ring-2 ring-[#0f5257] placeholder:text-[#7a9aa0]"

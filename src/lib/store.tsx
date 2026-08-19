@@ -5,7 +5,7 @@ import { playChaching } from '@/lib/sound'
 import { breatheFire } from '@/lib/fire'
 import {
   loadRemote, saveRemote, pushStateNow, onAuthChange, signInWithGoogle,
-  signOutAccount, createHousehold, joinHousehold, leaveHousehold,
+  signOutAccount, createHousehold, joinHousehold, leaveHousehold, logAuth,
   currentAccount, type AccountInfo, type SyncStatus,
 } from '@/lib/firebase'
 
@@ -192,6 +192,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       .then(() => { if (!cancelled) setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) })
       .catch(() => { if (!cancelled) { hydratedRef.current = true; setSyncStatus('local-only'); setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null) } })
     const unsub = onAuthChange((user) => {
+      logAuth(`auth state → ${user ? (user.email ?? `anon ${user.uid.slice(0, 6)}…`) : 'signed out'}`)
       if (!cancelled && user && user.uid !== uidRef.current) {
         // Account changed (Google sign-in/out) — re-hydrate from the new account.
         hydrate()
