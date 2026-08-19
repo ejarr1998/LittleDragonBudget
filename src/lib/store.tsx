@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BudgetState, Category, Goal, IncomeSource, Transaction } from '@/types'
-import { categorize, monthKey, uid } from '@/lib/money'
+import { categorize, cleanMerchant, monthKey, uid } from '@/lib/money'
 import { playChaching } from '@/lib/sound'
+import { breatheFire } from '@/lib/fire'
 import {
   loadRemote, saveRemote, pushStateNow, onAuthChange, signInWithGoogle,
   signOutAccount, createHousehold, joinHousehold, leaveHousehold,
@@ -239,7 +240,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       await pushStateNow(uidRef.current, householdRef.current, stateRef.current)
     },
     addTransaction: (t) => {
-      if (t.amount > 0) playChaching() // manual expenses only — imports don't chime
+      if (t.amount > 0) { playChaching(); breatheFire() } // manual expenses only — imports stay quiet
       setState((s) => ({
         ...s,
         transactions: [{ ...t, id: uid(), categoryId: t.categoryId ?? categorize(t.merchant, s.categories) }, ...s.transactions]
@@ -255,7 +256,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       let added = 0
       setState((s) => {
         const seen = new Set(s.transactions.map((t) => `${t.date}|${t.merchant}|${t.amount}`))
-        const fresh = rows.filter((r) => !seen.has(`${r.date}|${r.merchant}|${r.amount}`))
+        const fresh = rows
+          .map((r) => ({ ...r, merchant: cleanMerchant(r.merchant) }))
+          .filter((r) => !seen.has(`${r.date}|${r.merchant}|${r.amount}`))
         added = fresh.length
         return {
           ...s,

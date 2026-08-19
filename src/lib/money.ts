@@ -100,6 +100,24 @@ export function parseCSV(text: string): { rows: { date: string; merchant: string
   return { rows, skipped }
 }
 
+/** Clean bank-style merchant strings: 'SQ *COFFEE SHOP #1234 AUSTIN TX' → 'Coffee Shop'. */
+export function cleanMerchant(raw: string): string {
+  if (/^AMZN|AMAZON\.COM/i.test(raw.trim())) return 'Amazon'
+  let m = raw.trim()
+  m = m.replace(/^(SQ \*|TST\*|SP \*|PP\*|PAYPAL ?\*?|INTUIT \*|AMZN MKTP( US)?|AMZNMKTPLACE|APL\*ITUNES|POS (PURCHASE )?|DEBIT CARD PURCHASE ?-? ?|CHECKCARD \d* ?|VISA (DDA|PURCHASE) ?|ACH (DEBIT|CREDIT) ?|PREAUTHORIZED )/i, '')
+  m = m.replace(/\s+#\d+\b.*$/, '') // store number and everything after
+  m = m.replace(/\*\S*$/, '') // trailing order code like *2K4X9
+  m = m.replace(/\s+\d{4,}$/, '') // trailing reference digits
+  m = m.replace(/\s+[A-Z]{2}$/, '') // trailing state code (all-caps strings)
+  m = m.replace(/\bWHSE\b|\bSTORE\b(?=\s*$)/gi, '') // warehouse/store filler words
+  m = m.replace(/[*]+/g, ' ').replace(/\s{2,}/g, ' ').trim()
+  if (m.length > 3 && m === m.toUpperCase() && /[A-Z]/.test(m)) {
+    m = m.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) // title case
+    m = m.replace(/'(S|T|Re|Ll|D)\b/g, (s) => s.toLowerCase()) // fix "Trader Joe'S" → "Trader Joe's"
+  }
+  return m || raw
+}
+
 export const inMonth = (t: Transaction, key: string) => monthKey(t.date) === key
 
 export const spent = (txns: Transaction[]) => txns.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0)
