@@ -34,8 +34,8 @@ export function DragonFlame({ size = 40, className = '' }: { size?: number; clas
         style={{
           width: flame,
           height: flame,
-          left: size * 0.26,
-          top: size * 0.40,
+          left: size * 0.18,
+          top: size * 0.38,
           transformOrigin: '50% 50%',
           opacity: firing ? 1 : 0,
           transition: 'opacity 0.18s ease',
