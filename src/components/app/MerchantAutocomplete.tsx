@@ -78,7 +78,10 @@ export function MerchantAutocomplete({
         className={`w-full outline-none focus:ring-2 ring-[#0f5257] placeholder:text-[#7a9aa0] ${inputClassName}`}
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-30 left-0 right-0 top-full mt-1.5 rounded-[16px] bg-white shadow-xl ring-1 ring-[#0e1a1c]/8 overflow-y-auto cl-scroll max-h-[264px]">
+        <div
+          className="absolute z-30 top-full mt-1.5 rounded-[16px] bg-white shadow-xl ring-1 ring-[#0e1a1c]/8 overflow-y-auto cl-scroll max-h-[264px]"
+          style={{ left: 0, minWidth: 'min(320px, 78vw)', width: 'max(100%, 260px)' }}
+        >
           {suggestions.map((s, i) => {
             const cat = catOf(s.categoryId)
             return (
@@ -95,8 +98,7 @@ export function MerchantAutocomplete({
                     <CategoryIcon icon={cat.icon} color={cat.color} size={12} />
                   </span>
                 )}
-                <span className="flex-1 text-sm truncate">{s.label}</span>
-                {cat && <span className="text-[10px] font-medium text-[#7a9aa0] shrink-0">{cat.name}</span>}
+                <span className="flex-1 text-sm font-medium truncate">{s.label}</span>
               </button>
             )
           })}

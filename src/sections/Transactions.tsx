@@ -95,7 +95,7 @@ export function Transactions({ month }: { month: string }) {
   return (
     <div className="space-y-4">
       {/* Quick add */}
-      <div data-animation="fade-in-up" className="rounded-[20px] bg-white p-4 sm:p-5">
+      <div data-animation="fade-in-up" className="relative z-20 rounded-[20px] bg-white p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-3">
           <span className="p-1.5 rounded-full bg-[#0f5257] text-[#ddedf0]"><Plus size={14} /></span>
           <h3 className="font-display text-lg">Quick add</h3>

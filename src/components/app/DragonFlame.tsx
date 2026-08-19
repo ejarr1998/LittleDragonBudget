@@ -27,17 +27,16 @@ export function DragonFlame({ size = 40, className = '' }: { size?: number; clas
       role="img"
     >
       <img src="./dragon.png" alt="" className="w-full h-full object-contain" draggable={false} />
-      {/* flame emerges from the mouth, angled up-left — visible only while firing */}
+      {/* flame base sits at the mouth, tip points down onto the coin — visible only while firing */}
       <svg
         viewBox="0 0 24 24"
         className={`absolute dragon-flame ${firing ? 'firing' : ''}`}
         style={{
           width: flame,
           height: flame,
-          left: size * 0.16,
-          top: size * 0.22,
-          transform: 'rotate(-38deg)',
-          transformOrigin: '85% 90%',
+          left: size * 0.26,
+          top: size * 0.40,
+          transformOrigin: '50% 50%',
           opacity: firing ? 1 : 0,
           transition: 'opacity 0.18s ease',
           filter: 'drop-shadow(0 0 3px rgba(255,140,66,0.55))',
