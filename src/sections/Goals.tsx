@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { useBudget } from '@/lib/store'
+import { ConfirmDialog, useConfirm } from '@/components/app/ConfirmDialog'
 import { fmt } from '@/lib/money'
 import { SegBar } from '@/components/app/ui'
 
 export function Goals() {
   const { goals, addGoal, contribute, deleteGoal } = useBudget()
+  const [confirm, askConfirm, closeConfirm] = useConfirm()
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [target, setTarget] = useState('')
@@ -57,7 +59,11 @@ export function Goals() {
             >
               <div className="flex items-start justify-between">
                 <h3 className="font-display text-xl">{g.name}</h3>
-                <button onClick={() => deleteGoal(g.id)} className={`p-1.5 rounded-full transition-colors ${done ? 'hover:bg-white/20' : 'hover:bg-[#ddedf0] text-[#3d4d50]'}`} aria-label={`Delete ${g.name}`}>
+                <button onClick={() => askConfirm({
+                  title: `Delete ${g.name}?`,
+                  body: `The goal and its progress will be removed. This can't be undone.`,
+                  onConfirm: () => deleteGoal(g.id),
+                })} className={`p-1.5 rounded-full transition-colors ${done ? 'hover:bg-white/20' : 'hover:bg-[#ddedf0] text-[#3d4d50]'}`} aria-label={`Delete ${g.name}`}>
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -115,6 +121,7 @@ export function Goals() {
           </div>
         )}
       </div>
+      <ConfirmDialog request={confirm} onClose={closeConfirm} />
     </div>
-  )
+    )
 }

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { ArrowDownLeft, Trash2, Upload, Repeat, Undo2, Info, Plus } from 'lucide-react'
 import { useBudget } from '@/lib/store'
+import { ConfirmDialog, useConfirm } from '@/components/app/ConfirmDialog'
 import { categorize, fmt, monthKey, parseCSV, todayKey } from '@/lib/money'
 import { parseStatementPDF } from '@/lib/pdf'
 import { CategoryIcon } from '@/components/app/ui'
@@ -12,6 +13,7 @@ type Filter = 'all' | 'expense' | 'income'
 export function Transactions({ month }: { month: string }) {
   const { transactions, categories, addTransaction, deleteTransaction, recategorize, importTransactions, undoImport } = useBudget()
   const [filter, setFilter] = useState<Filter>('all')
+  const [confirm, askConfirm, closeConfirm] = useConfirm()
   const [categoryId, setCategoryId] = useState('all')
   const [query, setQuery] = useState('')
   const [importMsg, setImportMsg] = useState<string | null>(null)
@@ -278,7 +280,11 @@ export function Transactions({ month }: { month: string }) {
                     {income ? '+' : '−'}{fmt(Math.abs(t.amount))}
                   </span>
                   <button
-                    onClick={() => deleteTransaction(t.id)}
+                    onClick={() => askConfirm({
+                      title: `Delete ${t.merchant || 'this transaction'}?`,
+                      body: `${fmt(Math.abs(t.amount))} will be removed from your records. This can't be undone.`,
+                      onConfirm: () => deleteTransaction(t.id),
+                    })}
                     className="sm:opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#c0564b] hover:bg-[#c0564b]/10 transition-all"
                     aria-label="Delete transaction"
                   >
@@ -290,6 +296,7 @@ export function Transactions({ month }: { month: string }) {
           </div>
         )}
       </div>
+      <ConfirmDialog request={confirm} onClose={closeConfirm} />
     </div>
   )
 }

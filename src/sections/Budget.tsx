@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Minus, Plus, Check, Pencil, Trash2, Users, User, X, Wallet } from 'lucide-react'
 import { useBudget, useMonthSpend } from '@/lib/store'
+import { ConfirmDialog, useConfirm } from '@/components/app/ConfirmDialog'
 import { fmt } from '@/lib/money'
 import { CategoryIcon, Donut, SegBar } from '@/components/app/ui'
 import { BUCKET_DESCRIPTIONS, BUCKET_LABELS, type Bucket } from '@/types'
@@ -15,6 +16,7 @@ function IncomeSection({ earned }: { earned: number }) {
   const { incomes, addIncome, updateIncome, deleteIncome } = useBudget()
   const [adding, setAdding] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
+  const [confirm, askConfirm, closeConfirm] = useConfirm()
   const [name, setName] = useState('')
   const [owner, setOwner] = useState('')
   const [amount, setAmount] = useState('')
@@ -97,7 +99,11 @@ function IncomeSection({ earned }: { earned: number }) {
               <Pencil size={13} />
             </button>
             <button
-              onClick={() => deleteIncome(i.id)}
+              onClick={() => askConfirm({
+                title: `Delete ${i.name}?`,
+                body: `${fmt(i.amount)}/mo will be removed from your expected income. This can't be undone.`,
+                onConfirm: () => deleteIncome(i.id),
+              })}
               className="sm:opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#c0564b] hover:bg-[#c0564b]/10 transition-all shrink-0"
               aria-label={`Delete ${i.name}`}
             >
@@ -158,8 +164,9 @@ function IncomeSection({ earned }: { earned: number }) {
           <Plus size={15} /> add income source
         </button>
       )}
+      <ConfirmDialog request={confirm} onClose={closeConfirm} />
     </div>
-  )
+    )
 }
 
 /** Accordion-style bucket groups with editable per-category limits. */
