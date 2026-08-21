@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Repeat, TrendingDown, TrendingUp, Store, Lightbulb } from 'lucide-react'
 import { useBudget, useMonthSpend } from '@/lib/store'
-import { fmt, monthKey, shiftMonth } from '@/lib/money'
+import { fmt, monthKey, shiftMonth, cleanMerchant } from '@/lib/money'
 import { CategoryIcon, SegBar } from '@/components/app/ui'
 
 export function Insights({ month }: { month: string }) {
@@ -70,10 +70,10 @@ export function Insights({ month }: { month: string }) {
         <div className="mt-5 space-y-4">
           {topMerchants.map(([name, m], i) => (
             <div key={name}>
-              <div className="flex items-baseline justify-between text-sm mb-1.5">
-                <span className="font-medium truncate">
+              <div className="flex items-baseline justify-between gap-3 text-sm mb-1.5">
+                <span className="font-medium truncate min-w-0 flex-1">
                   <span className="font-mono-num text-[11px] text-[#3d4d50] mr-2">{String(i + 1).padStart(2, '0')}</span>
-                  {name}
+                  {cleanMerchant(name)}
                 </span>
                 <span className="font-mono-num text-xs shrink-0">{fmt(m.total)} <span className="text-[#3d4d50]">· {m.count}×</span></span>
               </div>
@@ -93,8 +93,8 @@ export function Insights({ month }: { month: string }) {
         <div className="mt-5 divide-y divide-[#eef6f7]">
           {recurring.map(([name, amt]) => (
             <div key={name} className="flex items-center justify-between py-3 text-sm">
-              <span className="font-medium">{name}</span>
-              <span className="font-mono-num text-xs">{fmt(amt)}</span>
+              <span className="font-medium truncate min-w-0 flex-1 mr-3">{cleanMerchant(name)}</span>
+              <span className="font-mono-num text-xs shrink-0">{fmt(amt)}</span>
             </div>
           ))}
           {recurring.length === 0 && <p className="py-6 text-sm text-[#3d4d50]">No recurring charges detected.</p>}

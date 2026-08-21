@@ -119,10 +119,10 @@ export function StatCard({
     <div
       data-animation="fade-in-up"
       style={{ animationDelay: `${delay}ms` }}
-      className={`rounded-[20px] p-5 ${tones[tone]}`}
+      className={`rounded-[20px] p-5 min-w-0 overflow-hidden ${tones[tone]}`}
     >
-      <div className="text-[11px] uppercase tracking-[0.14em] opacity-70">{label}</div>
-      <div className="font-display text-[2rem] leading-tight tnum mt-1">{value}</div>
+      <div className="text-[11px] uppercase tracking-[0.14em] opacity-70 truncate">{label}</div>
+      <div className="font-display text-[clamp(1.35rem,6.2vw,2rem)] leading-tight tnum mt-1 truncate">{value}</div>
       {sub && <div className={`text-xs mt-1 ${subTones[tone]}`}>{sub}</div>}
     </div>
   )

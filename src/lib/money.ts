@@ -102,8 +102,19 @@ export function parseCSV(text: string): { rows: { date: string; merchant: string
 
 /** Clean bank-style merchant strings: 'SQ *COFFEE SHOP #1234 AUSTIN TX' → 'Coffee Shop'. */
 export function cleanMerchant(raw: string): string {
-  if (/^AMZN|AMAZON\.COM/i.test(raw.trim())) return 'Amazon'
-  let m = raw.trim()
+  const t = raw.trim()
+  if (/^AMZN|AMAZON\.COM/i.test(t)) return 'Amazon'
+  // Person-to-person and ACH patterns seen in real bank exports
+  const zelle = t.match(/^ZELLE (TO|FROM) (.+?) ON \d{2}\/\d{2}.*/i)
+  if (zelle) {
+    const who = zelle[2].toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+    return `Zelle ${zelle[1].toLowerCase()} ${who}`
+  }
+  if (/^VENMO/i.test(t)) return 'Venmo'
+  if (/^VW CREDIT/i.test(t)) return 'VW Credit'
+  if (/STATE ?FARM/i.test(t)) return 'State Farm'
+  let m = t
+  m = m.replace(/^BUSINESS TO BUSINESS (ACH )?/i, '')
   m = m.replace(/^(SQ \*|TST\*|SP \*|PP\*|PAYPAL ?\*?|INTUIT \*|AMZN MKTP( US)?|AMZNMKTPLACE|APL\*ITUNES|POS (PURCHASE )?|DEBIT CARD PURCHASE ?-? ?|CHECKCARD \d* ?|VISA (DDA|PURCHASE) ?|ACH (DEBIT|CREDIT) ?|PREAUTHORIZED )/i, '')
   m = m.replace(/\s+#\d+\b.*$/, '') // store number and everything after
   m = m.replace(/\*\S*$/, '') // trailing order code like *2K4X9
@@ -115,6 +126,9 @@ export function cleanMerchant(raw: string): string {
     m = m.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) // title case
     m = m.replace(/'(S|T|Re|Ll|D)\b/g, (s) => s.toLowerCase()) // fix "Trader Joe'S" → "Trader Joe's"
   }
+  m = m.replace(/\s*\S*\.(com|co|net|org|io)\S*$/i, '') // trailing domain junk like "Anthropic.Comca"
+  m = m.replace(/\b(\w+)( \1\b)+/gi, '$1') // collapse repeated words: "Anthropic Anthropic" → "Anthropic"
+  m = m.replace(/\s{2,}/g, ' ').trim()
   return m || raw
 }
 
