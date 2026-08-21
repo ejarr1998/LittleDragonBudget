@@ -11,29 +11,26 @@ export function Dashboard({ month, go }: { month: string; go: (v: View) => void 
   const { txns, spent, earned, byCategory } = useMonthSpend(month)
   const isCurrent = month === monthKey(new Date())
 
-  const budgeted = useMemo(() => categories.filter((c) => c.limit > 0), [categories])
-  const totalLimit = useMemo(() => budgeted.reduce((s, c) => s + c.limit, 0), [budgeted])
+  const budgeted = categories.filter((c) => c.limit > 0)
+  const totalLimit = budgeted.reduce((s, c) => s + c.limit, 0)
   // Expected income from the Budget tab; once real deposits arrive, those win.
   const expected = incomes.reduce((s, i) => s + i.amount, 0) || monthlyIncome || 0
   const incomeBasis = earned > 0 ? earned : expected
   const left = incomeBasis - spent
 
-  // Daily pace for the current month — plain arithmetic, no memo needed.
-  const pace = (() => {
+  // Daily pace for the current month
+  const pace = useMemo(() => {
     if (!isCurrent || totalLimit === 0) return null
     const now = new Date()
     const daysIn = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
     const elapsed = now.getDate() / daysIn
     const used = spent / totalLimit
     return { elapsed, used, ahead: used <= elapsed }
-  })()
+  }, [isCurrent, spent, totalLimit])
 
-  const donutData = useMemo(
-    () => budgeted
-      .map((c) => ({ label: c.name, value: byCategory[c.id] ?? 0, color: c.color }))
-      .sort((a, b) => b.value - a.value),
-    [budgeted, byCategory],
-  )
+  const donutData = budgeted
+    .map((c) => ({ label: c.name, value: byCategory[c.id] ?? 0, color: c.color }))
+    .sort((a, b) => b.value - a.value)
 
   const trend = useMemo(() => {
     const arr: { label: string; spent: number; earned: number; current: boolean }[] = []

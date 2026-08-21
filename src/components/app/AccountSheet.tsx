@@ -1,45 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud, Download, FileUp } from 'lucide-react'
+import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud } from 'lucide-react'
 import { useBudget } from '@/lib/store'
-import { getLastAuthError, getAuthLog, getRedirectPatchStatus, isIOSStandalone, SITE_URL, INVITE_CODE_LENGTH } from '@/lib/firebase'
-import { exportBackup, readBackup } from '@/lib/backup'
 
 /** Account & sharing sheet — Google sign-in, household invite codes, local import. */
 export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const {
-    account, syncStatus, signInGoogle, signOut, createInvite, joinInvite, leaveHousehold,
-    importLocal, restoreBackup, transactions, categories, goals, incomes, monthlyIncome,
-  } = useBudget()
-  const [restoreMsg, setRestoreMsg] = useState<string | null>(null)
+  const { account, syncStatus, signInGoogle, signOut, createInvite, joinInvite, leaveHousehold, importLocal, transactions } = useBudget()
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [code, setCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const [imported, setImported] = useState(false)
-  const [authDebug, setAuthDebug] = useState<string | null>(() => getLastAuthError())
-
-  const [authLog, setAuthLog] = useState<string[]>([])
-  const isInstalledApp =
-    (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  // iOS treats a home-screen icon and Safari as separate apps, so sign-in
-  // cannot complete without leaving the icon; see openInSafariForSignIn.
-  const needsSafariHandoff = isIOSStandalone()
-
-  const [handoffBlocked, setHandoffBlocked] = useState(false)
-
-  // Refresh diagnostics every time the sheet opens
-  useEffect(() => {
-    if (open) {
-      const err = getLastAuthError()
-      setAuthDebug(err)
-      setAuthLog(getAuthLog())
-      setHandoffBlocked(!!err && (err.includes('handoff-blocked') || err.includes('missing-redirect-event')))
-    }
-  }, [open])
-
   if (!open) return null
 
   const run = async (label: string, fn: () => Promise<void>) => {
@@ -55,14 +27,10 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
             : c.code === 'auth/account-exists-with-different-credential'
               ? 'That email is already linked to another sign-in method.'
             : c.message === 'bad-code'
-              ? 'That code did not match any household, or it has already been used. Ask for a fresh one.'
-            : c.message === 'expired-code'
-              ? 'That invite code has expired. Invite codes last 7 days — generate a new one.'
-            : /database is closing/i.test(c.message ?? '')
-              ? "Sign-in almost completed but the browser closed its storage mid-handoff. This is usually a one-off — tap Sign in again."
+              ? 'That code did not match any household. Check the letters and try again.'
               : `Sign-in failed (${c.code ?? c.message ?? 'unknown error'}). Tell me this code and I can pin it down.`
       )
-    } finally { setBusy(null); setAuthDebug(getLastAuthError()) }
+    } finally { setBusy(null) }
   }
 
   const sheet = (
@@ -103,94 +71,19 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
               </div>
             ) : (
               <>
-                {needsSafariHandoff ? (
-                  <>
-                    <div className="text-sm font-medium">Join with a code instead</div>
-                    <p className="text-[11px] text-[#3d4d50] mt-1 leading-relaxed">
-                      iOS keeps this installed icon separate from Safari, so Google sign-in can't finish here directly — attempts to hand off to Safari automatically haven't been reliable. This path sidesteps that entirely and doesn't need this icon to sign in at all:
-                    </p>
-                    <ol className="text-[11px] text-[#3d4d50] mt-2 ml-4 list-decimal space-y-1.5 leading-relaxed">
-                      <li>Open the <b>Safari app</b> yourself (not from this icon) and go to the link below.</li>
-                      <li>Sign in with Google there — this part already works.</li>
-                      <li>In Safari, scroll to "Share with your partner" and tap <b>Create invite code</b>.</li>
-                      <li>Come back to this icon and enter that code under <b>Join with a code</b> below — this icon can stay signed out.</li>
-                    </ol>
-                    <button
-                      onClick={() => { navigator.clipboard?.writeText(SITE_URL); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-                      className="mt-3 flex items-center gap-1.5 rounded-full border border-[#c4dbe0] px-3.5 py-1.5 text-xs font-medium text-[#3d4d50] hover:border-[#0f5257] transition-colors"
-                    >
-                      {copied ? <Check size={12} className="text-[#1f7a4d]" /> : <Copy size={12} />} {copied ? 'Link copied — paste it in Safari' : 'Copy site link'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-sm font-medium">Sign in with Google</div>
-                    <p className="text-[11px] text-[#3d4d50] mt-1 leading-relaxed">
-                      Right now this budget is tied to an anonymous session on this device. Sign in to attach it to your Google account — then you can share it.
-                    </p>
-                    <button
-                      onClick={() => run('in', signInGoogle)}
-                      disabled={busy !== null}
-                      className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
-                    >
-                      <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
-                    </button>
-                  </>
-                )}
-                {handoffBlocked && !needsSafariHandoff && (
-                  <div className="mt-3 rounded-[12px] bg-[#fdf3e7] border border-[#ecd9b8] p-3">
-                    <p className="text-[11px] font-semibold text-[#8a6d1a]">Sign-in didn't come back</p>
-                    <p className="text-[11px] text-[#6b5716] mt-1 leading-relaxed">
-                      Google finished, but the result never reached the app. Try these in order:
-                    </p>
-                    <ol className="text-[11px] text-[#6b5716] mt-1.5 ml-4 list-decimal space-y-1 leading-relaxed">
-                      <li>Tap <b>Sign in</b> again — a popup window should appear over the app now. If it does, this is fixed.</li>
-                      <li>Open the site in <b>Chrome itself</b> rather than the installed app, sign in there, then reopen the app.</li>
-                      <li>Still stuck? Sign in on a computer, tap <b>Create invite code</b> there, and use <b>Join with a code</b> here.</li>
-                    </ol>
-                    <p className="text-[11px] text-[#6b5716] mt-1.5 leading-relaxed">
-                      Third-party cookie settings are not the cause; you can leave those alone.
-                    </p>
-                  </div>
-                )}
-                {isInstalledApp && !handoffBlocked && !needsSafariHandoff && (
-                  <div className="mt-3 rounded-[12px] bg-[#eef6f7] p-3">
-                    <p className="text-[11px] text-[#3d4d50] leading-relaxed">
-                      You're in the installed app. If sign-in keeps bouncing you back here, your browser may be swallowing the result. Try opening the site in your normal browser, sign in there, then join this device with an invite code.
-                    </p>
-                    <button
-                      onClick={() => { navigator.clipboard?.writeText(SITE_URL); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-                      className="mt-2 flex items-center gap-1.5 rounded-full border border-[#c4dbe0] px-3.5 py-1.5 text-xs font-medium text-[#3d4d50] hover:border-[#0f5257] transition-colors"
-                    >
-                      {copied ? <Check size={12} className="text-[#1f7a4d]" /> : <Copy size={12} />} {copied ? 'Link copied' : 'Copy site link'}
-                    </button>
-                  </div>
-                )}
+                <div className="text-sm font-medium">Sign in with Google</div>
+                <p className="text-[11px] text-[#3d4d50] mt-1 leading-relaxed">
+                  Right now this budget is tied to an anonymous session on this device. Sign in to attach it to your Google account — then you can share it.
+                </p>
+                <button
+                  onClick={() => run('in', signInGoogle)}
+                  disabled={busy !== null}
+                  className="mt-3 flex items-center gap-2 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-sm font-semibold px-5 py-2.5 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
+                >
+                  <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
+                </button>
               </>
             )}
-          </div>
-
-          {/* Sign-in status & diagnostics — always visible so we can see what's happening */}
-          <div className={`rounded-[16px] border p-3.5 ${authDebug ? 'bg-[#fdf3e7] border-[#ecd9b8]' : 'bg-white border-[#e2eef1]'}`}>
-            <div className={`text-[11px] font-semibold ${authDebug ? 'text-[#8a6d1a]' : 'text-[#3d4d50]'}`}>
-              Sign-in status: {account?.isGoogle ? `signed in as ${account.email}` : account ? 'anonymous session (not signed in)' : 'starting…'} · {syncStatus}
-            </div>
-            {authDebug && (
-              <p className="text-[11px] text-[#8a3c33] mt-1 leading-relaxed break-words font-mono-num">Error: {authDebug}</p>
-            )}
-            {authLog.length > 0 && (
-              <div className="mt-1.5 space-y-0.5">
-                {authLog.map((l, i) => (
-                  <p key={i} className="text-[10px] text-[#5b7076] leading-snug break-words font-mono-num">{l}</p>
-                ))}
-              </div>
-            )}
-            <p className="text-[10px] text-[#7a9aa0] mt-1 leading-snug font-mono-num">
-              mode: {isInstalledApp ? 'installed app' : 'browser'} · redirect patch: {getRedirectPatchStatus()}
-            </p>
-            <p className={`text-[10px] mt-1.5 leading-relaxed ${authDebug ? 'text-[#6b5716]' : 'text-[#7a9aa0]'}`}>
-              If sign-in isn't sticking, send me a screenshot of this box — it records exactly what happened.
-            </p>
           </div>
 
           {/* Household sharing — anyone can join with a code; creating needs Google */}
@@ -248,12 +141,12 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                       value={joinCode}
                       onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                       placeholder="Enter code"
-                      maxLength={INVITE_CODE_LENGTH}
+                      maxLength={6}
                       className="flex-1 rounded-full bg-[#eef6f7] px-4 py-2 text-sm font-mono-num tracking-[0.15em] uppercase outline-none focus:ring-2 ring-[#0f5257] placeholder:normal-case placeholder:tracking-normal placeholder:text-[#7a9aa0]"
                     />
                     <button
                       onClick={() => run('join', () => joinInvite(joinCode))}
-                      disabled={busy !== null || joinCode.trim().length < INVITE_CODE_LENGTH}
+                      disabled={busy !== null || joinCode.trim().length < 6}
                       className="rounded-full bg-[#0e1a1c] text-[#ddedf0] text-xs font-semibold px-4 py-2 hover:bg-[#0f5257] transition-colors disabled:opacity-50"
                     >
                       {busy === 'join' ? 'Joining…' : 'Join'}
@@ -284,53 +177,6 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
               </button>
             </div>
           )}
-
-          {/* Backup & restore — works signed in or not, and never leaves the device */}
-          <div className="rounded-[16px] bg-white p-4">
-            <div className="flex items-center gap-2">
-              <span className="p-2 rounded-full bg-[#0f5257]/10 text-[#0f5257]"><Download size={15} /></span>
-              <div className="text-sm font-medium">Backup &amp; restore</div>
-            </div>
-            <p className="text-[11px] text-[#3d4d50] mt-2 leading-relaxed">
-              Saves everything ({transactions.length} transactions, limits, income, goals) to a JSON file you keep.
-              Worth doing before any big import.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                onClick={() => {
-                  exportBackup({ transactions, categories, goals, incomes, monthlyIncome })
-                  setRestoreMsg('Backup downloaded.')
-                }}
-                className="flex items-center gap-1.5 rounded-full bg-[#0e1a1c] text-[#ddedf0] text-xs font-semibold px-4 py-2 hover:bg-[#0f5257] transition-colors"
-              >
-                <Download size={13} /> Download backup
-              </button>
-              <label className="flex items-center gap-1.5 rounded-full border border-[#c4dbe0] px-4 py-2 text-xs font-medium text-[#3d4d50] hover:border-[#0f5257] transition-colors cursor-pointer">
-                <FileUp size={13} /> Restore from file
-                <input
-                  type="file"
-                  accept="application/json,.json"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0]
-                    e.target.value = ''
-                    if (!f) return
-                    try {
-                      const restored = await readBackup(f)
-                      restoreBackup(restored)
-                      setRestoreMsg(`Restored ${restored.transactions.length} transactions from that backup.`)
-                    } catch (ex) {
-                      setRestoreMsg((ex as Error).message)
-                    }
-                  }}
-                />
-              </label>
-            </div>
-            {restoreMsg && <p className="text-[11px] text-[#3d4d50] mt-2 leading-relaxed">{restoreMsg}</p>}
-            <p className="text-[11px] text-[#8a6d1a] mt-2 leading-relaxed">
-              Restoring replaces everything currently in the app{account?.householdId ? ' and in your household' : ''}.
-            </p>
-          </div>
 
           {err && <p className="text-xs text-[#c0564b] font-medium leading-relaxed">{err}</p>}
         </div>

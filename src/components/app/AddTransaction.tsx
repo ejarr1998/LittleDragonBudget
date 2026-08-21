@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { useBudget } from '@/lib/store'
 import { todayKey } from '@/lib/money'
@@ -13,6 +13,10 @@ export function AddTransaction({ open, onClose }: { open: boolean; onClose: () =
   const [date, setDate] = useState(todayKey())
   const [categoryId, setCategoryId] = useState('')
   const [note, setNote] = useState('')
+
+  useEffect(() => {
+    if (open) { setMerchant(''); setAmount(''); setNote(''); setCategoryId(''); setKind('expense'); setDate(todayKey()) }
+  }, [open])
 
   const visible = categories.filter((c) => (kind === 'income' ? c.id === 'income' : c.id !== 'income'))
   const valid = merchant.trim() && parseFloat(amount) > 0 && date

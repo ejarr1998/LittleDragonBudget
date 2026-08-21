@@ -39,12 +39,9 @@ function Shell() {
     return () => document.removeEventListener('fullscreenchange', onChange)
   }, [])
 
-  // iOS Safari does not implement the Fullscreen API on documentElement.
-  const canFullscreen = typeof document !== 'undefined' && !!document.documentElement.requestFullscreen
-
   const toggleFullscreen = () => {
-    const p = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()
-    void p?.catch(() => { /* denied by the browser — nothing to do */ })
+    if (document.fullscreenElement) document.exitFullscreen()
+    else document.documentElement.requestFullscreen()
   }
 
   return (
@@ -67,16 +64,14 @@ function Shell() {
               >
                 <Plus size={18} />
               </button>
-              {canFullscreen && (
-                <button
-                  onClick={toggleFullscreen}
-                  className="p-2.5 rounded-full hover:bg-[#c4dbe0] text-[#3d4d50] transition-colors"
-                  title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-                  aria-label="Toggle fullscreen"
-                >
-                  {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-                </button>
-              )}
+              <button
+                onClick={toggleFullscreen}
+                className="p-2.5 rounded-full hover:bg-[#c4dbe0] text-[#3d4d50] transition-colors"
+                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                aria-label="Toggle fullscreen"
+              >
+                {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+              </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -104,8 +99,7 @@ function Shell() {
       </div>
 
       <MobileNav view={view} setView={setView} />
-      {/* keyed on `open` so each visit remounts with fresh fields */}
-      <AddTransaction key={String(addOpen)} open={addOpen} onClose={() => setAddOpen(false)} />
+      <AddTransaction open={addOpen} onClose={() => setAddOpen(false)} />
       <AccountSheet open={accountOpen} onClose={() => setAccountOpen(false)} />
     </div>
   )

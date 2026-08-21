@@ -23,19 +23,10 @@ if ('serviceWorker' in navigator) {
       window.location.reload()
     })
     navigator.serviceWorker.register('./sw.js').then((reg) => {
-      // Check for updates on launch, when returning to the app, and every minute.
+      // Check for updates on launch, when returning to the app, and every minute
       reg.update()
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') reg.update()
-      })
-      // iOS Safari can fully suspend a backgrounded tab's JS rather than just
-      // hiding it — timers and even visibilitychange can go quiet. When iOS
-      // restores a page from that frozen state it fires 'pageshow' (with
-      // event.persisted = true) rather than firing 'load' or a fresh
-      // visibilitychange, so without this an app left backgrounded for a
-      // while could keep running a stale build even after several deploys.
-      window.addEventListener('pageshow', (e) => {
-        if ((e as PageTransitionEvent).persisted) reg.update()
       })
       setInterval(() => reg.update(), 60_000)
     }).catch(() => { /* offline or unsupported — app still works */ })
