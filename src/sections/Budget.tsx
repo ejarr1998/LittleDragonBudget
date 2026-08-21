@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Minus, Plus, Check, Pencil, Trash2, Users, User, X, Wallet } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { Minus, Plus, Check, Pencil, Trash2, Users, User, X, Wallet, ArrowDownUp, ChevronUp, ChevronDown } from 'lucide-react'
 import { useBudget, useMonthSpend } from '@/lib/store'
 import { ConfirmDialog, useConfirm } from '@/components/app/ConfirmDialog'
 import { fmt } from '@/lib/money'
@@ -178,6 +178,26 @@ export function Budget({ month }: { month: string }) {
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
 
+  type SectionId = 'total' | 'pie' | 'income' | 'buckets'
+  const DEFAULT_ORDER: SectionId[] = ['total', 'pie', 'income', 'buckets']
+  const [order, setOrder] = useState<SectionId[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ldb-budget-order') ?? 'null')
+      if (Array.isArray(saved) && saved.length === 4 && saved.every((x) => DEFAULT_ORDER.includes(x))) return saved
+    } catch { /* fall through */ }
+    return DEFAULT_ORDER
+  })
+  const [arranging, setArranging] = useState(false)
+  const move = (id: SectionId, dir: -1 | 1) =>
+    setOrder((o) => {
+      const i = o.indexOf(id)
+      const j = i + dir
+      if (j < 0 || j >= o.length) return o
+      const n = [...o]; [n[i], n[j]] = [n[j], n[i]]
+      try { localStorage.setItem('ldb-budget-order', JSON.stringify(n)) } catch { /* ignore */ }
+      return n
+    })
+
   const budgeted = categories.filter((c) => c.limit > 0)
   const totalLimit = budgeted.reduce((s, c) => s + c.limit, 0)
 
@@ -187,192 +207,237 @@ export function Budget({ month }: { month: string }) {
     setEditing(null)
   }
 
+  const sections: Record<SectionId, ReactNode> = {
+    income: <IncomeSection earned={earned} />,
+    pie: (totalLimit > 0 ? (() => {
+  const leftover = Math.max(0, expectedIncome - totalLimit)
+  const overBy = Math.max(0, totalLimit - expectedIncome)
+  const pieTotal = Math.max(expectedIncome, totalLimit)
+  const data = [
+    ...budgeted.map((c) => ({ label: c.name, value: c.limit, color: c.color })),
+    ...(expectedIncome > 0 && leftover > 0
+      ? [{ label: 'Left over (unassigned)', value: leftover, color: 'rgba(14,26,28,0.14)' }]
+      : []),
+  ]
   return (
-    <div className="space-y-4">
-      <IncomeSection earned={earned} />
-
-      {/* Income pie — the whole circle is your monthly income; slivers are allocations */}
-      {totalLimit > 0 && (() => {
-        const leftover = Math.max(0, expectedIncome - totalLimit)
-        const overBy = Math.max(0, totalLimit - expectedIncome)
-        const pieTotal = Math.max(expectedIncome, totalLimit)
-        const data = [
-          ...budgeted.map((c) => ({ label: c.name, value: c.limit, color: c.color })),
-          ...(expectedIncome > 0 && leftover > 0
-            ? [{ label: 'Left over (unassigned)', value: leftover, color: 'rgba(14,26,28,0.14)' }]
-            : []),
-        ]
-        return (
-          <div data-animation="fade-in-up" style={{ animationDelay: '40ms' }} className="rounded-[20px] bg-white p-5 sm:p-6">
-            <div className="flex items-baseline justify-between gap-3 flex-wrap">
-              <div>
-                <h3 className="font-display text-xl">Your income, divided up</h3>
-                <p className="text-xs text-[#3d4d50] mt-0.5 max-w-md leading-relaxed">
-                  {expectedIncome > 0
-                    ? `The whole circle is your ${fmt(expectedIncome)} monthly income — each sliver is what you've assigned to a category.`
-                    : 'Add income sources above and each sliver will show its share of your paycheck.'}
-                </p>
-              </div>
-              {expectedIncome > 0 && leftover > 0 && (
-                <span className="rounded-full bg-[#eef6f7] px-3.5 py-1.5 text-[11px] font-semibold text-[#0f5257]">
-                  {fmt(leftover)} unassigned
-                </span>
-              )}
-            </div>
-            {overBy > 0 && (
-              <p className="mt-3 rounded-[12px] bg-[#c0564b]/10 text-[#c0564b] text-xs font-medium px-4 py-2.5">
-                Your budget assigns {fmt(overBy)} more than you make — trim a category or raise an income source.
-              </p>
-            )}
-            <div className="mt-5 grid sm:grid-cols-2 gap-6 items-center">
-              <Donut data={data} total={pieTotal} centerLabel={expectedIncome > 0 ? 'income' : 'planned'} />
-              <div className="space-y-2.5">
-                {[...budgeted].sort((a, b) => b.limit - a.limit).map((c) => (
-                  <div key={c.id} className="flex items-center gap-2.5 text-sm">
-                    <span className="w-2.5 h-2.5 rounded-[4px] shrink-0" style={{ background: c.color }} />
-                    <span className="flex-1 truncate">{c.name}</span>
-                    <span className="font-mono-num text-xs text-[#3d4d50]">{Math.round((c.limit / pieTotal) * 100)}%</span>
-                    <span className="font-mono-num text-xs w-16 text-right">{fmt(c.limit)}</span>
-                  </div>
-                ))}
-                {expectedIncome > 0 && leftover > 0 && (
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <span className="w-2.5 h-2.5 rounded-[4px] shrink-0" style={{ background: 'rgba(14,26,28,0.14)' }} />
-                    <span className="flex-1 truncate text-[#3d4d50]">Left over (unassigned)</span>
-                    <span className="font-mono-num text-xs text-[#3d4d50]">{Math.round((leftover / pieTotal) * 100)}%</span>
-                    <span className="font-mono-num text-xs w-16 text-right">{fmt(leftover)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            {expectedIncome > 0 && leftover > 0 && (
-              <p className="mt-4 text-[11px] text-[#3d4d50] leading-relaxed">
-                Tip: give every dollar a job — sweep the left-over sliver into a Goal at the end of the month.
-              </p>
-            )}
-          </div>
-        )
-      })()}
-
-      {/* Total budget banner */}
-      <div data-animation="fade-in-up" className="rounded-[20px] bg-[#0e1a1c] text-[#ddedf0] p-5 sm:p-6">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Total monthly budget</div>
-            <div className="font-display text-4xl tnum mt-1.5">{fmt(totalLimit)}</div>
-          </div>
-          <img src="./dragon.png" alt="" className="w-11 h-11 object-contain opacity-90 hidden sm:block" />
-          <div className="text-right">
-            <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Spent so far</div>
-            <div className="font-display text-2xl tnum mt-1.5">{fmt(spent)}</div>
-          </div>
+    <div data-animation="fade-in-up" style={{ animationDelay: '40ms' }} className="rounded-[20px] bg-white p-5 sm:p-6">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="font-display text-xl">Your income, divided up</h3>
+          <p className="text-xs text-[#3d4d50] mt-0.5 max-w-md leading-relaxed">
+            {expectedIncome > 0
+              ? `The whole circle is your ${fmt(expectedIncome)} monthly income — each sliver is what you've assigned to a category.`
+              : 'Add income sources above and each sliver will show its share of your paycheck.'}
+          </p>
         </div>
-        <div className="mt-4 flex items-center gap-3">
-          <div className="flex-1">
-            <SegBar pct={totalLimit ? spent / totalLimit : 0} color="#2a9aa2" segments={40} />
-          </div>
-          <span className="font-mono-num text-xs text-[#9fc3c9] shrink-0">
-            {totalLimit ? `${Math.round((spent / totalLimit) * 100)}%` : '—'}
+        {expectedIncome > 0 && leftover > 0 && (
+          <span className="rounded-full bg-[#eef6f7] px-3.5 py-1.5 text-[11px] font-semibold text-[#0f5257]">
+            {fmt(leftover)} unassigned
           </span>
+        )}
+      </div>
+      {overBy > 0 && (
+        <p className="mt-3 rounded-[12px] bg-[#c0564b]/10 text-[#c0564b] text-xs font-medium px-4 py-2.5">
+          Your budget assigns {fmt(overBy)} more than you make — trim a category or raise an income source.
+        </p>
+      )}
+      <div className="mt-5 grid sm:grid-cols-2 gap-6 items-center">
+        <Donut data={data} total={pieTotal} centerLabel={expectedIncome > 0 ? 'income' : 'planned'} />
+        <div className="space-y-2.5">
+          {[...budgeted].sort((a, b) => b.limit - a.limit).map((c) => (
+            <div key={c.id} className="flex items-center gap-2.5 text-sm">
+              <span className="w-2.5 h-2.5 rounded-[4px] shrink-0" style={{ background: c.color }} />
+              <span className="flex-1 truncate">{c.name}</span>
+              <span className="font-mono-num text-xs text-[#3d4d50]">{Math.round((c.limit / pieTotal) * 100)}%</span>
+              <span className="font-mono-num text-xs w-16 text-right">{fmt(c.limit)}</span>
+            </div>
+          ))}
+          {expectedIncome > 0 && leftover > 0 && (
+            <div className="flex items-center gap-2.5 text-sm">
+              <span className="w-2.5 h-2.5 rounded-[4px] shrink-0" style={{ background: 'rgba(14,26,28,0.14)' }} />
+              <span className="flex-1 truncate text-[#3d4d50]">Left over (unassigned)</span>
+              <span className="font-mono-num text-xs text-[#3d4d50]">{Math.round((leftover / pieTotal) * 100)}%</span>
+              <span className="font-mono-num text-xs w-16 text-right">{fmt(leftover)}</span>
+            </div>
+          )}
         </div>
       </div>
+      {expectedIncome > 0 && leftover > 0 && (
+        <p className="mt-4 text-[11px] text-[#3d4d50] leading-relaxed">
+          Tip: give every dollar a job — sweep the left-over sliver into a Goal at the end of the month.
+        </p>
+      )}
+    </div>
+  )
+})() : null),
+    total: (
+<div data-animation="fade-in-up" className="rounded-[20px] bg-[#0e1a1c] text-[#ddedf0] p-5 sm:p-6">
+  <div className="flex items-end justify-between gap-4">
+    <div>
+      <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Total monthly budget</div>
+      <div className="font-display text-4xl tnum mt-1.5">{fmt(totalLimit)}</div>
+    </div>
+    <img src="./dragon.png" alt="" className="w-11 h-11 object-contain opacity-90 hidden sm:block" />
+    <div className="text-right">
+      <div className="text-[11px] uppercase tracking-[0.14em] text-[#9fc3c9]">Spent so far</div>
+      <div className="font-display text-2xl tnum mt-1.5">{fmt(spent)}</div>
+    </div>
+  </div>
+  <div className="mt-4 flex items-center gap-3">
+    <div className="flex-1">
+      <SegBar pct={totalLimit ? spent / totalLimit : 0} color="#2a9aa2" segments={40} />
+    </div>
+    <span className="font-mono-num text-xs text-[#9fc3c9] shrink-0">
+      {totalLimit ? `${Math.round((spent / totalLimit) * 100)}%` : '—'}
+    </span>
+  </div>
+</div>
+    ),
+    buckets: <>{(['fixed', 'flexible', 'nonmonthly'] as Bucket[]).map((bucket, bi) => {
+  const cats = categories.filter((c) => c.bucket === bucket && c.id !== 'income')
+  const bucketSpent = cats.reduce((s, c) => s + (byCategory[c.id] ?? 0), 0)
+  const bucketLimit = cats.reduce((s, c) => s + c.limit, 0)
+  const isOpen = open[bucket]
+  return (
+    <div
+      key={bucket}
+      data-animation="fade-in-up"
+      style={{ animationDelay: `${bi * 80}ms` }}
+      className="rounded-[20px] bg-white overflow-hidden"
+    >
+      <button
+        onClick={() => setOpen((o) => ({ ...o, [bucket]: !o[bucket] }))}
+        className="w-full px-5 sm:px-6 py-5 text-left"
+      >
+        <div className="flex items-center gap-3 sm:gap-4">
+          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm leading-none shrink-0 transition-colors ${isOpen ? 'bg-[#0f5257] text-[#ddedf0]' : 'bg-[#ddedf0] text-[#0f5257]'}`}>
+            {isOpen ? '—' : '+'}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="font-display text-lg leading-tight">{BUCKET_LABELS[bucket]}</div>
+            <div className="text-xs text-[#3d4d50] mt-0.5 truncate">{BUCKET_DESCRIPTIONS[bucket]}</div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="font-mono-num text-sm">{fmt(bucketSpent)} <span className="text-[#3d4d50]">/ {fmt(bucketLimit)}</span></div>
+            <div className="text-[11px] text-[#3d4d50] mt-0.5">
+              {bucketLimit ? `${Math.round((bucketSpent / bucketLimit) * 100)}% used` : 'no limits set'}
+            </div>
+          </div>
+        </div>
+        <div className="mt-3 ml-10">
+          <SegBar pct={bucketLimit ? bucketSpent / bucketLimit : 0} color={bucketLimit && bucketSpent > bucketLimit ? '#c0564b' : '#0f5257'} segments={30} />
+        </div>
+      </button>
 
-      {(['fixed', 'flexible', 'nonmonthly'] as Bucket[]).map((bucket, bi) => {
-        const cats = categories.filter((c) => c.bucket === bucket && c.id !== 'income')
-        const bucketSpent = cats.reduce((s, c) => s + (byCategory[c.id] ?? 0), 0)
-        const bucketLimit = cats.reduce((s, c) => s + c.limit, 0)
-        const isOpen = open[bucket]
+      {isOpen && (
+        <div className="px-5 sm:px-6 pb-6 space-y-5">
+          {cats.map((c) => {
+            const value = byCategory[c.id] ?? 0
+            const pct = c.limit ? value / c.limit : 0
+            const isEditing = editing === c.id
+            return (
+              <div key={c.id}>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="p-1.5 rounded-full shrink-0" style={{ background: `${c.color}1a` }}>
+                    <CategoryIcon icon={c.icon} color={c.color} size={14} />
+                  </span>
+                  <span className="text-sm font-medium flex-1 truncate">{c.name}</span>
+                  {isEditing ? (
+                    <span className="flex items-center gap-1.5">
+                      <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
+                        autoFocus type="number" min="0" value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && save(c.id)}
+                        className="w-24 rounded-lg bg-[#ddedf0]/70 px-2.5 py-1.5 text-sm tnum outline-none focus:ring-2 ring-[#0f5257]"
+                      />
+                      <button onClick={() => save(c.id)} className="p-1.5 rounded-full bg-[#0f5257] text-white" aria-label="Save limit">
+                        <Check size={13} />
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2 text-sm shrink-0">
+                      <span className={`font-mono-num ${pct > 1 ? 'text-[#c0564b] font-semibold' : ''}`}>
+                        {fmt(value)}
+                      </span>
+                      <span className="text-[#3d4d50] font-mono-num text-xs">/ {fmt(c.limit)}</span>
+                      <button
+                        onClick={() => { setEditing(c.id); setDraft(String(c.limit)) }}
+                        className="p-1.5 rounded-full hover:bg-[#ddedf0] text-[#3d4d50] transition-colors"
+                        aria-label={`Edit ${c.name} limit`}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </span>
+                  )}
+                </div>
+                <SegBar pct={pct} color={c.color} />
+                {pct > 1 && (
+                  <p className="mt-1.5 text-[11px] text-[#c0564b] font-medium">
+                    {fmt(value - c.limit)} over — consider moving money from a quieter category.
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+})}</>,
+  }
+  const SECTION_LABELS: Record<SectionId, string> = {
+    total: 'Total monthly budget',
+    pie: 'Your income, divided up',
+    income: 'Income sources',
+    buckets: 'Category limits',
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setArranging((a) => !a)}
+          className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${arranging ? 'bg-[#0f5257] text-white' : 'bg-white text-[#3d4d50] hover:text-[#0f5257]'}`}
+        >
+          {arranging ? <><Check size={13} /> Done</> : <><ArrowDownUp size={13} /> Rearrange</>}
+        </button>
+      </div>
+      {order.map((id, i) => {
+        const content = sections[id]
+        if (!content) return null
+        if (!arranging) return <div key={id}>{content}</div>
         return (
-          <div
-            key={bucket}
-            data-animation="fade-in-up"
-            style={{ animationDelay: `${bi * 80}ms` }}
-            className="rounded-[20px] bg-white overflow-hidden"
-          >
-            <button
-              onClick={() => setOpen((o) => ({ ...o, [bucket]: !o[bucket] }))}
-              className="w-full px-5 sm:px-6 py-5 text-left"
-            >
-              <div className="flex items-center gap-3 sm:gap-4">
-                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm leading-none shrink-0 transition-colors ${isOpen ? 'bg-[#0f5257] text-[#ddedf0]' : 'bg-[#ddedf0] text-[#0f5257]'}`}>
-                  {isOpen ? '—' : '+'}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="font-display text-lg leading-tight">{BUCKET_LABELS[bucket]}</div>
-                  <div className="text-xs text-[#3d4d50] mt-0.5 truncate">{BUCKET_DESCRIPTIONS[bucket]}</div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="font-mono-num text-sm">{fmt(bucketSpent)} <span className="text-[#3d4d50]">/ {fmt(bucketLimit)}</span></div>
-                  <div className="text-[11px] text-[#3d4d50] mt-0.5">
-                    {bucketLimit ? `${Math.round((bucketSpent / bucketLimit) * 100)}% used` : 'no limits set'}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 ml-10">
-                <SegBar pct={bucketLimit ? bucketSpent / bucketLimit : 0} color={bucketLimit && bucketSpent > bucketLimit ? '#c0564b' : '#0f5257'} segments={30} />
-              </div>
-            </button>
-
-            {isOpen && (
-              <div className="px-5 sm:px-6 pb-6 space-y-5">
-                {cats.map((c) => {
-                  const value = byCategory[c.id] ?? 0
-                  const pct = c.limit ? value / c.limit : 0
-                  const isEditing = editing === c.id
-                  return (
-                    <div key={c.id}>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="p-1.5 rounded-full shrink-0" style={{ background: `${c.color}1a` }}>
-                          <CategoryIcon icon={c.icon} color={c.color} size={14} />
-                        </span>
-                        <span className="text-sm font-medium flex-1 truncate">{c.name}</span>
-                        {isEditing ? (
-                          <span className="flex items-center gap-1.5">
-                            <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
-                              autoFocus type="number" min="0" value={draft}
-                              onChange={(e) => setDraft(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && save(c.id)}
-                              className="w-24 rounded-lg bg-[#ddedf0]/70 px-2.5 py-1.5 text-sm tnum outline-none focus:ring-2 ring-[#0f5257]"
-                            />
-                            <button onClick={() => save(c.id)} className="p-1.5 rounded-full bg-[#0f5257] text-white" aria-label="Save limit">
-                              <Check size={13} />
-                            </button>
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-2 text-sm shrink-0">
-                            <span className={`font-mono-num ${pct > 1 ? 'text-[#c0564b] font-semibold' : ''}`}>
-                              {fmt(value)}
-                            </span>
-                            <span className="text-[#3d4d50] font-mono-num text-xs">/ {fmt(c.limit)}</span>
-                            <button
-                              onClick={() => { setEditing(c.id); setDraft(String(c.limit)) }}
-                              className="p-1.5 rounded-full hover:bg-[#ddedf0] text-[#3d4d50] transition-colors"
-                              aria-label={`Edit ${c.name} limit`}
-                            >
-                              <Pencil size={12} />
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                      <SegBar pct={pct} color={c.color} />
-                      {pct > 1 && (
-                        <p className="mt-1.5 text-[11px] text-[#c0564b] font-medium">
-                          {fmt(value - c.limit)} over — consider moving money from a quieter category.
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+          <div key={id} className="rounded-[22px] outline-2 outline-dashed outline-[#2a9aa2] outline-offset-4">
+            <div className="flex items-center justify-between rounded-[14px] bg-[#0f5257]/5 px-4 py-2 mb-2">
+              <span className="text-xs font-semibold text-[#0f5257]">{SECTION_LABELS[id]}</span>
+              <span className="flex items-center gap-1">
+                <button
+                  onClick={() => move(id, -1)}
+                  disabled={i === 0}
+                  className="p-1.5 rounded-full bg-white text-[#0f5257] disabled:opacity-30 hover:bg-[#ddedf0] transition-colors"
+                  aria-label={`Move ${SECTION_LABELS[id]} up`}
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  onClick={() => move(id, 1)}
+                  disabled={i === order.length - 1}
+                  className="p-1.5 rounded-full bg-white text-[#0f5257] disabled:opacity-30 hover:bg-[#ddedf0] transition-colors"
+                  aria-label={`Move ${SECTION_LABELS[id]} down`}
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </span>
+            </div>
+            <div className="pointer-events-none">{content}</div>
           </div>
         )
       })}
 
       <p data-animation="fade-in" className="text-xs text-[#3d4d50] px-2 flex items-center gap-1.5">
-        <Plus size={12} /> Tip: unspent money does not roll over here by default — sweep it into a Goal at month end.
-        <Minus size={12} className="hidden" />
-      </p>
+  <Plus size={12} /> Tip: unspent money does not roll over here by default — sweep it into a Goal at month end.
+  <Minus size={12} className="hidden" />
+</p>
     </div>
   )
 }
