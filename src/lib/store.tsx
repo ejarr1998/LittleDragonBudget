@@ -123,6 +123,7 @@ interface Store extends BudgetState {
   deleteTransaction: (id: string) => void
   recategorize: (id: string, categoryId: string) => void
   renameTransaction: (id: string, merchant: string) => void
+  updateTransaction: (id: string, patch: Partial<Omit<Transaction, 'id'>>) => void
   importTransactions: (rows: { date: string; merchant: string; amount: number }[]) => { added: number; importId: string }
   undoImport: (importId: string) => number
   setLimit: (categoryId: string, limit: number) => void
@@ -264,6 +265,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     })),
     renameTransaction: (id, merchant) => setState((s) => ({
       ...s, transactions: s.transactions.map((t) => (t.id === id && merchant.trim() ? { ...t, merchant: merchant.trim() } : t)),
+    })),
+    updateTransaction: (id, patch) => setState((s) => ({
+      ...s, transactions: s.transactions.map((t) => (t.id === id ? { ...t, ...patch } : t)),
     })),
     importTransactions: (rows) => {
       const importId = uid()

@@ -116,10 +116,14 @@ export function cleanMerchant(raw: string): string {
   let m = t
   m = m.replace(/^BUSINESS TO BUSINESS (ACH )?/i, '')
   m = m.replace(/^(SQ \*|TST\*|SP \*|PP\*|PAYPAL ?\*?|INTUIT \*|AMZN MKTP( US)?|AMZNMKTPLACE|APL\*ITUNES|POS (PURCHASE )?|DEBIT CARD PURCHASE ?-? ?|CHECKCARD \d* ?|VISA (DDA|PURCHASE) ?|ACH (DEBIT|CREDIT) ?|PREAUTHORIZED )/i, '')
+  m = m.replace(/^PURCHASE AUTHORIZED ON \d{2}\/\d{2}\s*/i, '') // card-network boilerplate
+  m = m.replace(/\b\d{2}\/\d{2}(\/\d{2,4})?\b/g, ' ') // embedded dates
   m = m.replace(/\s+#\d+\b.*$/, '') // store number and everything after
   m = m.replace(/\*\S*$/, '') // trailing order code like *2K4X9
+  m = m.replace(/\b\d{4,}\b/g, ' ') // long reference/phone digits anywhere
   m = m.replace(/\s+\d{4,}$/, '') // trailing reference digits
   m = m.replace(/\s+[A-Z]{2}$/, '') // trailing state code (all-caps strings)
+  m = m.replace(/\b(CARD|X{2,}|#{2,})\b/gi, ' ') // card-reference filler
   m = m.replace(/\bWHSE\b|\bSTORE\b(?=\s*$)/gi, '') // warehouse/store filler words
   m = m.replace(/[*]+/g, ' ').replace(/\s{2,}/g, ' ').trim()
   if (m.length > 3 && m === m.toUpperCase() && /[A-Z]/.test(m)) {
