@@ -1,5 +1,5 @@
 /* Little Dragon Budget — service worker with auto-update */
-const CACHE = 'ldb-20260821165426__BUILD__'
+const CACHE = 'ldb-20260821173553__BUILD__'
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png']
 
 self.addEventListener('install', (e) => {
@@ -9,7 +9,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('ldb-20260821165426') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('ldb-20260821173553') && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   )
 })
