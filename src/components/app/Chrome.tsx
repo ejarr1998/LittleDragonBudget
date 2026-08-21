@@ -103,7 +103,7 @@ export function MonthSwitcher({ month, setMonth }: { month: string; setMonth: (m
       >
         <ChevronLeft size={18} />
       </button>
-      <span className="font-display text-lg min-w-[150px] text-center">{monthLabel(month)}</span>
+      <span className="font-display text-base sm:text-lg min-w-[112px] sm:min-w-[150px] text-center whitespace-nowrap">{monthLabel(month)}</span>
       <button
         onClick={() => setMonth(shiftMonth(month, 1))}
         disabled={isCurrent}

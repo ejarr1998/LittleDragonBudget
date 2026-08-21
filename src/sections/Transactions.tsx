@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { ArrowDownLeft, Trash2, Upload, Repeat, Undo2, Info, Plus } from 'lucide-react'
+import { ArrowDownLeft, Trash2, Upload, Repeat, Undo2, Info, Plus, Pencil, Check } from 'lucide-react'
 import { useBudget } from '@/lib/store'
 import { ConfirmDialog, useConfirm } from '@/components/app/ConfirmDialog'
 import { categorize, fmt, monthKey, parseCSV, todayKey } from '@/lib/money'
@@ -11,7 +11,9 @@ import { MerchantAutocomplete } from '@/components/app/MerchantAutocomplete'
 type Filter = 'all' | 'expense' | 'income'
 
 export function Transactions({ month }: { month: string }) {
-  const { transactions, categories, addTransaction, deleteTransaction, recategorize, importTransactions, undoImport } = useBudget()
+  const { transactions, categories, addTransaction, deleteTransaction, recategorize, renameTransaction, importTransactions, undoImport } = useBudget()
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [confirm, askConfirm, closeConfirm] = useConfirm()
   const [categoryId, setCategoryId] = useState('all')
@@ -257,9 +259,40 @@ export function Transactions({ month }: { month: string }) {
                     {income ? <ArrowDownLeft size={15} className="text-[#1f7a4d]" /> : <CategoryIcon icon={catIcon(t.categoryId)} color={categories.find((c) => c.id === t.categoryId)?.color ?? '#5f6b6d'} size={15} />}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate flex items-center gap-1.5">
-                      {t.merchant}
-                      {t.recurring && <Repeat size={11} className="text-[#2a9aa2]" />}
+                    <div className="text-sm font-medium flex items-center gap-1.5">
+                      {renaming === t.id ? (
+                        <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                          <input autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="true" data-lpignore="true" data-bwignore="true" data-form-type="other"
+                            autoFocus value={renameDraft}
+                            onChange={(e) => setRenameDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') { renameTransaction(t.id, renameDraft); setRenaming(null) }
+                              if (e.key === 'Escape') setRenaming(null)
+                            }}
+                            className="flex-1 min-w-0 rounded-lg bg-[#ddedf0]/70 px-2.5 py-1 text-sm outline-none focus:ring-2 ring-[#0f5257]"
+                            aria-label="Rename transaction"
+                          />
+                          <button
+                            onClick={() => { renameTransaction(t.id, renameDraft); setRenaming(null) }}
+                            className="p-1.5 rounded-full bg-[#0f5257] text-white shrink-0"
+                            aria-label="Save name"
+                          >
+                            <Check size={12} />
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="truncate flex items-center gap-1.5 min-w-0">
+                          <span className="truncate">{t.merchant}</span>
+                          {t.recurring && <Repeat size={11} className="text-[#2a9aa2] shrink-0" />}
+                          <button
+                            onClick={() => { setRenaming(t.id); setRenameDraft(t.merchant) }}
+                            className="sm:opacity-0 group-hover:opacity-100 p-1 rounded-full text-[#3d4d50] hover:bg-[#ddedf0] transition-all shrink-0"
+                            aria-label={`Rename ${t.merchant}`}
+                          >
+                            <Pencil size={11} />
+                          </button>
+                        </span>
+                      )}
                     </div>
                     <div className="text-[11px] text-[#3d4d50] flex items-center gap-1 flex-wrap">
                       {new Date(t.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Minus, Plus, Check, Pencil, Trash2, Users, User, X, Wallet, ArrowDownUp, ChevronUp, ChevronDown } from 'lucide-react'
+import { Minus, Plus, Check, Pencil, Trash2, Users, User, X, Wallet, ChevronUp, ChevronDown } from 'lucide-react'
 import { useBudget, useMonthSpend } from '@/lib/store'
 import { ConfirmDialog, useConfirm } from '@/components/app/ConfirmDialog'
 import { fmt } from '@/lib/money'
@@ -170,7 +170,7 @@ function IncomeSection({ earned }: { earned: number }) {
 }
 
 /** Accordion-style bucket groups with editable per-category limits. */
-export function Budget({ month }: { month: string }) {
+export function Budget({ month, arranging, onArrangingChange }: { month: string; arranging: boolean; onArrangingChange: (a: boolean) => void }) {
   const { categories, setLimit } = useBudget()
   const expectedIncome = useExpectedIncome()
   const { byCategory, spent, earned } = useMonthSpend(month)
@@ -187,7 +187,6 @@ export function Budget({ month }: { month: string }) {
     } catch { /* fall through */ }
     return DEFAULT_ORDER
   })
-  const [arranging, setArranging] = useState(false)
   const move = (id: SectionId, dir: -1 | 1) =>
     setOrder((o) => {
       const i = o.indexOf(id)
@@ -394,14 +393,6 @@ export function Budget({ month }: { month: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button
-          onClick={() => setArranging((a) => !a)}
-          className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${arranging ? 'bg-[#0f5257] text-white' : 'bg-white text-[#3d4d50] hover:text-[#0f5257]'}`}
-        >
-          {arranging ? <><Check size={13} /> Done</> : <><ArrowDownUp size={13} /> Rearrange</>}
-        </button>
-      </div>
       {order.map((id, i) => {
         const content = sections[id]
         if (!content) return null
@@ -433,6 +424,17 @@ export function Budget({ month }: { month: string }) {
           </div>
         )
       })}
+
+      {arranging && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40">
+          <button
+            onClick={() => onArrangingChange(false)}
+            className="flex items-center gap-1.5 rounded-full bg-[#0f5257] text-white px-5 py-2.5 text-sm font-semibold shadow-lg shadow-[#0f5257]/30"
+          >
+            <Check size={14} /> Done arranging
+          </button>
+        </div>
+      )}
 
       <p data-animation="fade-in" className="text-xs text-[#3d4d50] px-2 flex items-center gap-1.5">
   <Plus size={12} /> Tip: unspent money does not roll over here by default — sweep it into a Goal at month end.

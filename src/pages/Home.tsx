@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Plus, MoreVertical, Maximize, Minimize, CircleUserRound } from 'lucide-react'
+import { Plus, Maximize, Minimize, CircleUserRound, UserRoundCheck, UserRound, ArrowDownUp, Check } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { BudgetProvider } from '@/lib/store'
+import { BudgetProvider, useBudget } from '@/lib/store'
 import { monthKey } from '@/lib/money'
 import { MobileNav, MonthSwitcher, Sidebar, type View } from '@/components/app/Chrome'
 import { AddTransaction } from '@/components/app/AddTransaction'
@@ -28,10 +28,12 @@ function Shell() {
     const h = location.hash.replace('#', '') as View
     return ['dashboard', 'budget', 'transactions', 'insights', 'goals'].includes(h) ? h : 'dashboard'
   })
-  const setView = (v: View) => { setViewRaw(v); history.replaceState(null, '', `#${v}`) }
+  const setView = (v: View) => { setViewRaw(v); setArranging(false); history.replaceState(null, '', `#${v}`) }
   const [month, setMonth] = useState(monthKey(new Date()))
   const [addOpen, setAddOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [arranging, setArranging] = useState(false)
+  const { account } = useBudget()
   const [isFullscreen, setIsFullscreen] = useState(false)
   useEffect(() => {
     const onChange = () => setIsFullscreen(!!document.fullscreenElement)
@@ -50,12 +52,12 @@ function Shell() {
         <Sidebar view={view} setView={setView} onAdd={() => setAddOpen(true)} />
 
         <main className="flex-1 min-w-0">
-          <header className="flex flex-wrap items-center justify-between gap-3 mb-6">
-            <div className="flex items-center gap-3">
-              <DragonFlame size={40} className="md:hidden" />
-              <h1 className="font-display text-3xl tracking-tight">{TITLES[view]}</h1>
+          <header className="flex flex-wrap items-center justify-between gap-x-2 gap-y-3 mb-6">
+            <div className="flex items-center gap-3 min-w-0">
+              <DragonFlame size={40} className="md:hidden shrink-0" />
+              <h1 className="font-display text-2xl sm:text-3xl tracking-tight whitespace-nowrap">{TITLES[view]}</h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0 max-sm:w-full max-sm:justify-end">
               {view !== 'goals' && <MonthSwitcher month={month} setMonth={setMonth} />}
               <button
                 onClick={() => setAddOpen(true)}
@@ -66,7 +68,7 @@ function Shell() {
               </button>
               <button
                 onClick={toggleFullscreen}
-                className="p-2.5 rounded-full hover:bg-[#c4dbe0] text-[#3d4d50] transition-colors"
+                className="hidden sm:block p-2.5 rounded-full hover:bg-[#c4dbe0] text-[#3d4d50] transition-colors"
                 title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
                 aria-label="Toggle fullscreen"
               >
@@ -75,23 +77,29 @@ function Shell() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="p-2.5 rounded-full hover:bg-[#c4dbe0] text-[#3d4d50] transition-colors"
-                    aria-label="Data options"
+                    className={`p-2.5 rounded-full transition-colors ${account?.isGoogle ? 'bg-[#0f5257] text-white hover:bg-[#0c4449]' : 'hover:bg-[#c4dbe0] text-[#3d4d50]'}`}
+                    aria-label={account?.isGoogle ? `Signed in as ${account.email}` : 'Account — not signed in'}
+                    title={account?.isGoogle ? (account.email ?? 'Signed in') : 'Account'}
                   >
-                    <MoreVertical size={16} />
+                    {account?.isGoogle ? <UserRoundCheck size={16} /> : <UserRound size={16} />}
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-2xl">
                   <DropdownMenuItem onClick={() => setAccountOpen(true)} className="gap-2">
                     <CircleUserRound size={15} /> Account & sharing
                   </DropdownMenuItem>
+                  {view === 'budget' && (
+                    <DropdownMenuItem onClick={() => setArranging((a) => !a)} className="gap-2">
+                      {arranging ? <><Check size={15} /> Done arranging</> : <><ArrowDownUp size={15} /> Rearrange sections</>}
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </header>
 
           {view === 'dashboard' && <Dashboard month={month} go={setView} />}
-          {view === 'budget' && <Budget month={month} />}
+          {view === 'budget' && <Budget month={month} arranging={arranging} onArrangingChange={setArranging} />}
           {view === 'transactions' && <Transactions month={month} />}
           {view === 'insights' && <Insights month={month} />}
           {view === 'goals' && <Goals />}
