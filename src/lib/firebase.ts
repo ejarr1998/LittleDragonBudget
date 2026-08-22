@@ -174,11 +174,41 @@ export function currentAccount(): AccountInfo | null {
 }
 
 /** Google sign-in — redirect on mobile/standalone (popups fail there), popup on desktop. */
+const isIOSDevice = () =>
+  /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
 export async function signInWithGoogle(): Promise<User> {
   if (!auth) throw new Error('firebase-unavailable')
   const provider = new GoogleAuthProvider()
+  // iOS breaks the redirect flow: the sign-in leaves the app for Safari, and
+  // Apple's tracking prevention blocks the cross-site helper that hands the
+  // credential back to the app — the account is created but the session never
+  // sticks. The popup flow returns the credential via postMessage instead,
+  // which needs no shared storage, so prefer popup on iOS.
+  if (isIOSDevice()) {
+    try {
+      logAuth('opening Google popup (iOS)…')
+      const cred = await Promise.race([
+        signInWithPopup(auth, provider),
+        new Promise<never>((_, rej) => setTimeout(() => rej(Object.assign(new Error('popup-timeout'), { code: 'auth/popup-blocked' })), 20000)),
+      ])
+      logAuth(`popup OK → ${cred.user.email ?? cred.user.uid}`)
+      return cred.user
+    } catch (e) {
+      const code = (e as { code?: string }).code ?? ''
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        throw new Error('cancelled')
+      }
+      // popup unavailable (installed-app web view) — fall back to redirect
+      logAuth(`popup unavailable (${code || 'timeout'}) — trying redirect…`)
+      try { localStorage.setItem('ldb-signin-attempt', String(Date.now())) } catch { /* ignore */ }
+      await signInWithRedirect(auth, provider)
+      throw new Error('redirecting')
+    }
+  }
   const preferRedirect =
-    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    /Android/i.test(navigator.userAgent) ||
     (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true
   if (preferRedirect) {

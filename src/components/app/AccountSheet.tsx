@@ -3,6 +3,11 @@ import { createPortal } from 'react-dom'
 import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud } from 'lucide-react'
 import { useBudget } from '@/lib/store'
 
+const isIOSStandalone = () =>
+  (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) &&
+  ((typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true)
+
 /** Account & sharing sheet — Google sign-in, household invite codes, local import. */
 export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { account, syncStatus, signInGoogle, signOut, createInvite, joinInvite, leaveHousehold, importLocal, transactions } = useBudget()
@@ -82,6 +87,11 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                 >
                   <LogIn size={14} /> {busy === 'in' ? 'Signing in…' : 'Sign in with Google'}
                 </button>
+                {isIOSStandalone() && (
+                  <p className="mt-3 rounded-[12px] bg-[#eef6f7] text-[#0f5257] text-[11px] font-medium px-3.5 py-2.5 leading-relaxed">
+                    iPhone tip: if sign-in keeps asking again inside the installed app, open this site in <span className="font-semibold">Safari</span> instead and sign in there — Apple limits how installed apps receive the sign-in.
+                  </p>
+                )}
               </>
             )}
           </div>
