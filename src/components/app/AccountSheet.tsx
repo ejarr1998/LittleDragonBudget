@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud } from 'lucide-react'
 import { useBudget } from '@/lib/store'
@@ -10,13 +10,21 @@ const isIOSStandalone = () =>
 
 /** Account & sharing sheet — Google sign-in, household invite codes, local import. */
 export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { account, syncStatus, signInGoogle, signOut, createInvite, joinInvite, leaveHousehold, importLocal, transactions } = useBudget()
+  const { account, syncStatus, signInGoogle, signOut, createInvite, getMyInviteCode, joinInvite, leaveHousehold, importLocal, transactions } = useBudget()
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [code, setCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const [imported, setImported] = useState(false)
+
+  // Recover the household's invite code when the sheet opens (e.g. after app restart).
+  useEffect(() => {
+    if (open && account?.householdId && !code) {
+      getMyInviteCode().then((c) => { if (c) setCode(c) }).catch(() => {})
+    }
+  }, [open, account?.householdId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!open) return null
 
   const run = async (label: string, fn: () => Promise<void>) => {
@@ -24,8 +32,11 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
     try { await fn() } catch (e) {
       const c = (e as { code?: string; message?: string })
       if (c.message === 'redirecting' || c.message === 'cancelled') return
+      const rulesHelp = `Your Firestore security rules are blocking this. In the Firebase console → Firestore → Rules, paste this and Publish:\n\nmatch /households/{id} { allow read, write: if request.auth != null; match /{doc=**} { allow read, write: if request.auth != null; } }\nmatch /invites/{code} { allow read, create, delete: if request.auth != null; }`
       setErr(
-        c.code === 'auth/operation-not-allowed'
+        (c.code === 'permission-denied' || c.message === 'permission-denied' || (c.message ?? '').includes('permission-denied') || (c.message ?? '').includes('Missing or insufficient permissions'))
+          ? rulesHelp
+          : c.code === 'auth/operation-not-allowed'
           ? 'Google sign-in is not enabled yet — turn on the Google provider in the Firebase console (Authentication → Sign-in method).'
           : c.code === 'auth/unauthorized-domain'
             ? 'This domain is not authorized in Firebase — add it under Authentication → Settings → Authorized domains.'
@@ -107,8 +118,29 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
                 <>
                   <p className="text-[11px] text-[#3d4d50] leading-relaxed">
                     You're sharing a household budget — both of you see and edit the same numbers.
-                    Invite code: <span className="font-mono-num font-semibold text-[#0e1a1c]">{code ?? 'ask the household creator'}</span>
                   </p>
+                  {code ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono-num text-2xl tracking-[0.2em] font-semibold bg-[#eef6f7] rounded-[12px] px-4 py-2">{code}</span>
+                      <button
+                        onClick={() => { navigator.clipboard?.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+                        className="p-2 rounded-full hover:bg-[#ddedf0] transition-colors"
+                        aria-label="Copy code"
+                      >
+                        {copied ? <Check size={15} className="text-[#1f7a4d]" /> : <Copy size={15} />}
+                      </button>
+                    </div>
+                  ) : account.isGoogle ? (
+                    <button
+                      onClick={() => run('create', async () => setCode(await createInvite()))}
+                      disabled={busy !== null}
+                      className="rounded-full bg-[#0f5257] text-white text-xs font-semibold px-4 py-2 hover:bg-[#0e1a1c] transition-colors disabled:opacity-50"
+                    >
+                      {busy === 'create' ? 'Generating…' : 'Show invite code'}
+                    </button>
+                  ) : (
+                    <p className="text-[11px] text-[#7a9aa0] leading-relaxed">Ask the household creator for the invite code.</p>
+                  )}
                   <button
                     onClick={() => run('leave', leaveHousehold)}
                     disabled={busy !== null}
@@ -188,7 +220,7 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
             </div>
           )}
 
-          {err && <p className="text-xs text-[#c0564b] font-medium leading-relaxed">{err}</p>}
+          {err && <p className="text-xs text-[#c0564b] font-medium leading-relaxed whitespace-pre-line">{err}</p>}
         </div>
       </div>
     </div>

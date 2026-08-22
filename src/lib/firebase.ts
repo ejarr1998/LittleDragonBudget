@@ -5,7 +5,7 @@ import {
   browserPopupRedirectResolver, browserLocalPersistence,
   type Auth, type User,
 } from 'firebase/auth'
-import { doc, getDoc, getFirestore, setDoc, type Firestore } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, getFirestore, query, setDoc, where, type Firestore } from 'firebase/firestore'
 import type { BudgetState } from '@/types'
 
 const firebaseConfig = {
@@ -245,9 +245,26 @@ export async function createHousehold(): Promise<string> {
   const uid = auth.currentUser.uid
   const householdId = uid // owner uid doubles as household id — one household per owner
   const code = Math.random().toString(36).slice(2, 8).toUpperCase()
-  await setDoc(profileFor(uid), { householdId, email: auth.currentUser.email ?? null }, { merge: true })
+  await setDoc(profileFor(uid), { householdId, inviteCode: code, email: auth.currentUser.email ?? null }, { merge: true })
   await setDoc(doc(db, 'invites', code), { householdId, createdBy: uid, createdAt: Date.now() })
   return code
+}
+
+/** Recover the invite code for a household you own (saved on your profile, else look it up). */
+export async function findMyInviteCode(): Promise<string | null> {
+  if (!auth?.currentUser || !db) return null
+  const uid = auth.currentUser.uid
+  try {
+    const prof = await getDoc(profileFor(uid))
+    const saved = prof.data()?.inviteCode
+    if (typeof saved === 'string' && saved.length === 6) return saved
+  } catch { /* fall through to query */ }
+  try {
+    const q = query(collection(db, 'invites'), where('createdBy', '==', uid))
+    const snap = await getDocs(q)
+    if (!snap.empty) return snap.docs[0].id
+  } catch { /* rules may block listing — caller will offer regeneration */ }
+  return null
 }
 
 /** Join a household via invite code. Both members then share the same budget doc. */

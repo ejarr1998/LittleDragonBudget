@@ -5,7 +5,7 @@ import { playChaching } from '@/lib/sound'
 import { breatheFire } from '@/lib/fire'
 import {
   loadRemote, saveRemote, pushStateNow, onAuthChange, signInWithGoogle,
-  signOutAccount, createHousehold, joinHousehold, leaveHousehold, logAuth,
+  signOutAccount, createHousehold, joinHousehold, leaveHousehold, logAuth, findMyInviteCode,
   currentAccount, type AccountInfo, type SyncStatus,
 } from '@/lib/firebase'
 
@@ -116,6 +116,7 @@ interface Store extends BudgetState {
   signInGoogle: () => Promise<void>
   signOut: () => Promise<void>
   createInvite: () => Promise<string>
+  getMyInviteCode: () => Promise<string | null>
   joinInvite: (code: string) => Promise<void>
   leaveHousehold: () => Promise<void>
   importLocal: () => Promise<void>
@@ -228,6 +229,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       await hydrate()
       setAccount(currentAccount() ? { ...currentAccount()!, householdId: householdRef.current } : null)
     },
+    getMyInviteCode: () => findMyInviteCode(),
     createInvite: async () => {
       const code = await createHousehold()
       const uid = uidRef.current!
