@@ -44,6 +44,11 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
               ? 'That email is already linked to another sign-in method.'
             : c.message === 'bad-code'
               ? 'That code did not match any household. Check the letters and try again.'
+            : c.message === 'expired-code'
+              ? 'That code has expired (codes last 7 days) — ask for a fresh one.'
+            : c.message === 'own-code'
+              ? "That's your own household's code — share it with your partner instead."
+
               : `Sign-in failed (${c.code ?? c.message ?? 'unknown error'}). Tell me this code and I can pin it down.`
       )
     } finally { setBusy(null) }

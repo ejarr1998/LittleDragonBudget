@@ -5,7 +5,7 @@ import {
   browserPopupRedirectResolver, browserLocalPersistence,
   type Auth, type User,
 } from 'firebase/auth'
-import { collection, doc, getDoc, getDocs, getFirestore, query, setDoc, where, type Firestore } from 'firebase/firestore'
+import { deleteDoc, doc, getDoc, getFirestore, setDoc, type Firestore } from 'firebase/firestore'
 import type { BudgetState } from '@/types'
 
 const firebaseConfig = {
@@ -240,46 +240,73 @@ export async function signOutAccount() {
 }
 
 /** Create a household around the signed-in user's budget; returns an invite code. */
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000 // matches the expiry window the rules allow
+
+/** Create (or re-key) your household and mint a fresh 7-day invite code. */
 export async function createHousehold(): Promise<string> {
   if (!auth?.currentUser || !db) throw new Error('firebase-unavailable')
   const uid = auth.currentUser.uid
+  const email = auth.currentUser.email ?? null
   const householdId = uid // owner uid doubles as household id — one household per owner
   const code = Math.random().toString(36).slice(2, 8).toUpperCase()
-  await setDoc(profileFor(uid), { householdId, inviteCode: code, email: auth.currentUser.email ?? null }, { merge: true })
-  await setDoc(doc(db, 'invites', code), { householdId, createdBy: uid, createdAt: Date.now() })
+  const expiresAt = Date.now() + INVITE_TTL_MS
+  // Rules contract: household doc needs owner == hid; owner needs a members doc;
+  // invites need an expiresAt within 7 days.
+  await setDoc(doc(db, 'households', householdId), { owner: householdId, createdAt: Date.now() }, { merge: true })
+  await setDoc(doc(db, 'households', householdId, 'members', uid), { joinedAt: Date.now(), email }, { merge: true })
+    .catch((e) => {
+      // Rules freeze member docs after creation — already being a member is fine here.
+      const code = (e as { code?: string }).code ?? ''
+      if (code !== 'permission-denied') throw e
+    })
+  await setDoc(doc(db, 'invites', code), { householdId, createdBy: uid, createdAt: Date.now(), expiresAt })
+  await setDoc(profileFor(uid), { householdId, inviteCode: code, inviteExpiresAt: expiresAt, email }, { merge: true })
   return code
 }
 
-/** Recover the invite code for a household you own (saved on your profile, else look it up). */
+/** Recover your household's invite code from your profile — only while it is still valid. */
 export async function findMyInviteCode(): Promise<string | null> {
   if (!auth?.currentUser || !db) return null
-  const uid = auth.currentUser.uid
   try {
-    const prof = await getDoc(profileFor(uid))
-    const saved = prof.data()?.inviteCode
-    if (typeof saved === 'string' && saved.length === 6) return saved
-  } catch { /* fall through to query */ }
-  try {
-    const q = query(collection(db, 'invites'), where('createdBy', '==', uid))
-    const snap = await getDocs(q)
-    if (!snap.empty) return snap.docs[0].id
-  } catch { /* rules may block listing — caller will offer regeneration */ }
+    const prof = await getDoc(profileFor(auth.currentUser.uid))
+    const data = prof.data() as { inviteCode?: string; inviteExpiresAt?: number } | undefined
+    if (typeof data?.inviteCode === 'string' && data.inviteCode.length === 6 &&
+        typeof data.inviteExpiresAt === 'number' && data.inviteExpiresAt > Date.now()) {
+      return data.inviteCode
+    }
+  } catch { /* profile unreadable — caller offers regeneration */ }
   return null
 }
 
-/** Join a household via invite code. Both members then share the same budget doc. */
+/** Join a household via invite code. The code is the credential; it is burned on use. */
 export async function joinHousehold(code: string): Promise<void> {
   if (!auth?.currentUser || !db) throw new Error('firebase-unavailable')
-  const snap = await getDoc(doc(db, 'invites', code.trim().toUpperCase()))
+  const uid = auth.currentUser.uid
+  const inviteRef = doc(db, 'invites', code.trim().toUpperCase())
+  const snap = await getDoc(inviteRef)
   if (!snap.exists()) throw new Error('bad-code')
-  const { householdId } = snap.data() as { householdId: string }
-  await setDoc(profileFor(auth.currentUser.uid), { householdId, email: auth.currentUser.email ?? null }, { merge: true })
+  const { householdId, expiresAt } = snap.data() as { householdId: string; expiresAt?: number }
+  if (typeof expiresAt === 'number' && expiresAt <= Date.now()) throw new Error('expired-code')
+  if (householdId === uid) throw new Error('own-code')
+  // The rules validate membership against a live invite code passed as `code`.
+  await setDoc(doc(db, 'households', householdId, 'members', uid), {
+    code: code.trim().toUpperCase(),
+    joinedAt: Date.now(),
+    email: auth.currentUser.email ?? null,
+  })
+  await deleteDoc(inviteRef).catch(() => {}) // burn the code; failure just means it lingers until expiry
+  await setDoc(profileFor(uid), { householdId, email: auth.currentUser.email ?? null }, { merge: true })
 }
 
 /** Leave the household — back to a personal budget. */
 export async function leaveHousehold(): Promise<void> {
   if (!auth?.currentUser || !db) throw new Error('firebase-unavailable')
-  await setDoc(profileFor(auth.currentUser.uid), { householdId: null, email: auth.currentUser.email ?? null }, { merge: true })
+  const uid = auth.currentUser.uid
+  const householdId = await getHouseholdId(uid)
+  if (householdId) {
+    await deleteDoc(doc(db, 'households', householdId, 'members', uid)).catch(() => {})
+  }
+  await setDoc(profileFor(uid), { householdId: null, inviteCode: null, inviteExpiresAt: null, email: auth.currentUser.email ?? null }, { merge: true })
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
