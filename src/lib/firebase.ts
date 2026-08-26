@@ -195,55 +195,31 @@ const isIOSDevice = () =>
 export async function signInWithGoogle(): Promise<User> {
   if (!auth) throw new Error('firebase-unavailable')
   const provider = new GoogleAuthProvider()
-  // iOS breaks the redirect flow: the sign-in leaves the app for Safari, and
-  // Apple's tracking prevention blocks the cross-site helper that hands the
-  // credential back to the app — the account is created but the session never
-  // sticks. The popup flow returns the credential via postMessage instead,
-  // which needs no shared storage, so prefer popup on iOS.
-  if (isIOSDevice()) {
-    try {
-      logAuth('opening Google popup (iOS)…')
-      const cred = await Promise.race([
-        signInWithPopup(auth, provider),
-        new Promise<never>((_, rej) => setTimeout(() => rej(Object.assign(new Error('popup-timeout'), { code: 'auth/popup-blocked' })), 20000)),
-      ])
-      logAuth(`popup OK → ${cred.user.email ?? cred.user.uid}`)
-      return cred.user
-    } catch (e) {
-      const code = (e as { code?: string }).code ?? ''
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-        throw new Error('cancelled')
-      }
-      // popup unavailable (installed-app web view) — fall back to redirect
-      logAuth(`popup unavailable (${code || 'timeout'}) — trying redirect…`)
-      try { localStorage.setItem('ldb-signin-attempt', String(Date.now())) } catch { /* ignore */ }
-      await signInWithRedirect(auth, provider)
-      throw new Error('redirecting')
-    }
-  }
-  const preferRedirect =
-    /Android/i.test(navigator.userAgent) ||
-    (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches) ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  if (preferRedirect) {
-    try { localStorage.setItem('ldb-signin-attempt', String(Date.now())) } catch { /* ignore */ }
-    logAuth('starting Google redirect…')
-    await signInWithRedirect(auth, provider)
-    throw new Error('redirecting') // page navigates away; unreachable
-  }
+  // Popup-first on EVERY platform: the result comes back via window
+  // postMessage, which works even when third-party storage/cookies are
+  // blocked. The redirect flow depends on cross-site storage that both
+  // Chrome (Android) and Safari (iOS) now restrict, so it is only a fallback.
+  const isIOS = isIOSDevice()
   try {
-    const cred = await signInWithPopup(auth, provider)
+    logAuth(`opening Google popup${isIOS ? ' (iOS)' : ''}…`)
+    const cred = await Promise.race([
+      signInWithPopup(auth, provider),
+      new Promise<never>((_, rej) =>
+        setTimeout(() => rej(Object.assign(new Error('popup-timeout'), { code: 'auth/popup-timeout' })), 30000)),
+    ])
+    logAuth(`popup OK → ${cred.user.email ?? cred.user.uid}`)
     return cred.user
   } catch (e) {
     const code = (e as { code?: string }).code ?? ''
-    if (code === 'auth/popup-blocked' || code === 'auth/popup-failed' || code === 'auth/internal-error') {
-      await signInWithRedirect(auth, provider)
-      throw new Error('redirecting')
-    }
     if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
       throw new Error('cancelled') // user closed it — not a real failure
     }
-    throw e
+    // Popup unavailable or hung (installed-app web view, strict blockers):
+    // fall back to the redirect flow.
+    logAuth(`popup unavailable (${code || 'unknown'}) — trying redirect…`)
+    try { localStorage.setItem('ldb-signin-attempt', String(Date.now())) } catch { /* ignore */ }
+    await signInWithRedirect(auth, provider)
+    throw new Error('redirecting') // page navigates away; unreachable
   }
 }
 
