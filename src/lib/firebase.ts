@@ -159,7 +159,21 @@ export async function loadRemote(): Promise<{ uid: string; householdId: string |
 /** Observe auth changes (Google sign-in/out). */
 export function onAuthChange(cb: (user: User | null) => void) {
   if (!auth) return () => {}
-  return onAuthStateChanged(auth, cb)
+  return onAuthStateChanged(auth, (user) => {
+    // Remember Google sessions so we can tell when one vanishes.
+    try {
+      const wasGoogle = localStorage.getItem('ldb-google-email')
+      const isGoogle = user?.providerData.some((p) => p.providerId === 'google.com')
+      if (user && isGoogle && user.email) {
+        localStorage.setItem('ldb-google-email', user.email)
+      } else if (wasGoogle && (!user || user.isAnonymous)) {
+        logAuth(`Google session lost (${wasGoogle}) — refresh token revoked or app storage cleared`)
+        noteError('session', new Error(`auth/session-lost — the saved Google sign-in disappeared. Usually: the sign-in was revoked from a Google security prompt, or Android cleared the app's storage. Signing in again fixes it.`))
+        localStorage.removeItem('ldb-google-email')
+      }
+    } catch { /* ignore */ }
+    cb(user)
+  })
 }
 
 export function currentAccount(): AccountInfo | null {

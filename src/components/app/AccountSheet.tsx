@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { LogIn, LogOut, Users, Copy, Check, X, UploadCloud } from 'lucide-react'
 import { useBudget } from '@/lib/store'
+import { getAuthLog, getLastAuthError } from '@/lib/firebase'
 
 const isIOSStandalone = () =>
   (/iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) &&
@@ -226,9 +227,35 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
           )}
 
           {err && <p className="text-xs text-[#c0564b] font-medium leading-relaxed whitespace-pre-line">{err}</p>}
+
+          {/* Troubleshooting — collapsed by default */}
+          <details className="rounded-[16px] bg-white p-4">
+            <summary className="text-xs font-semibold text-[#3d4d50] cursor-pointer select-none">Troubleshooting</summary>
+            <TroubleshootingPanel />
+          </details>
         </div>
       </div>
     </div>
   )
   return createPortal(sheet, document.body)
+}
+
+function TroubleshootingPanel() {
+  const lastErr = getLastAuthError()
+  const log = getAuthLog()
+  const copyAll = () => {
+    const text = `Last error: ${lastErr ?? 'none'}\n${log.join('\n')}`
+    navigator.clipboard?.writeText(text).catch(() => {})
+  }
+  return (
+    <div className="mt-3 space-y-2">
+      {lastErr && <p className="text-[11px] text-[#c0564b] leading-relaxed">Last error: {lastErr}</p>}
+      <div className="max-h-36 overflow-y-auto rounded-[10px] bg-[#0e1a1c] p-3 font-mono-num text-[10px] leading-relaxed text-[#9fc3c9]">
+        {log.length === 0 ? 'No activity yet.' : log.map((l, i) => <div key={i}>{l}</div>)}
+      </div>
+      <button onClick={copyAll} className="rounded-full bg-[#eef6f7] px-3.5 py-1.5 text-[11px] font-semibold text-[#0f5257] hover:bg-[#ddedf0] transition-colors">
+        Copy diagnostics
+      </button>
+    </div>
+  )
 }
