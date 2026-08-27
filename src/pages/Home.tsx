@@ -48,7 +48,7 @@ function Shell() {
 
   return (
     <div className="min-h-screen p-4 md:p-6 md:pb-6" style={{ paddingBottom: 'calc(6.5rem + env(safe-area-inset-bottom))' }}>
-      <div className="max-w-[1280px] mx-auto flex gap-6 items-start">
+      <div className="max-w-[1280px] xl:max-w-[1440px] mx-auto flex gap-6 items-start">
         <Sidebar view={view} setView={setView} onAdd={() => setAddOpen(true)} />
 
         <main className="flex-1 min-w-0">

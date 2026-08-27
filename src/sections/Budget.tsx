@@ -391,14 +391,15 @@ export function Budget({ month, arranging, onArrangingChange }: { month: string;
     buckets: 'Category limits',
   }
 
+  const spanFor = (id: SectionId) => (id === 'total' ? 'lg:col-span-2' : '')
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
       {order.map((id, i) => {
         const content = sections[id]
         if (!content) return null
-        if (!arranging) return <div key={id}>{content}</div>
+        if (!arranging) return <div key={id} className={spanFor(id)}>{content}</div>
         return (
-          <div key={id} className="rounded-[22px] outline-2 outline-dashed outline-[#2a9aa2] outline-offset-4">
+          <div key={id} className={`rounded-[22px] outline-2 outline-dashed outline-[#2a9aa2] outline-offset-4 ${spanFor(id)}`}>
             <div className="flex items-center justify-between rounded-[14px] bg-[#0f5257]/5 px-4 py-2 mb-2">
               <span className="text-xs font-semibold text-[#0f5257]">{SECTION_LABELS[id]}</span>
               <span className="flex items-center gap-1">
@@ -436,7 +437,7 @@ export function Budget({ month, arranging, onArrangingChange }: { month: string;
         </div>
       )}
 
-      <p data-animation="fade-in" className="text-xs text-[#3d4d50] px-2 flex items-center gap-1.5">
+      <p data-animation="fade-in" className="text-xs text-[#3d4d50] px-2 flex items-center gap-1.5 lg:col-span-2">
   <Plus size={12} /> Tip: unspent money does not roll over here by default — sweep it into a Goal at month end.
   <Minus size={12} className="hidden" />
 </p>

@@ -98,7 +98,8 @@ export function Transactions({ month }: { month: string }) {
   const catIcon = (id: string) => categories.find((c) => c.id === id)?.icon ?? 'dots'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[minmax(340px,400px)_1fr] lg:gap-5 lg:items-start">
+      <div className="space-y-4">
       {/* Quick add */}
       <div data-animation="fade-in-up" className="relative z-20 rounded-[20px] bg-white p-4 sm:p-5">
         <div className="flex items-center gap-2 mb-3">
@@ -216,6 +217,8 @@ export function Transactions({ month }: { month: string }) {
         </div>
       )}
 
+      </div>
+      <div className="space-y-4 mt-4 lg:mt-0">
       {/* Filters */}
       <div data-animation="fade-in-up" style={{ animationDelay: '120ms' }} className="flex flex-wrap items-center gap-2">
         <div className="flex bg-white rounded-full p-1">
@@ -314,6 +317,7 @@ export function Transactions({ month }: { month: string }) {
             })}
           </div>
         )}
+      </div>
       </div>
       <ConfirmDialog request={confirm} onClose={closeConfirm} />
       <TransactionEditSheet transaction={editingTx} onClose={() => setEditingTx(null)} />
